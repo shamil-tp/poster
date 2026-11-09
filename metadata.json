@@ -1,0 +1,6 @@
+{
+  "name": "Shamil TP — Generative Poster Portfolio",
+  "description": "A zero-scroll, full-viewport generative poster portfolio for Backend-Focused Full Stack Developer Shamil TP, powered by 50 design styles, hybrid style synthesis, and real-time Markdown knowledge base parsing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
