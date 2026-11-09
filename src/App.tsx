@@ -392,10 +392,10 @@ export default function App() {
             isControlMenuOpen ? 'Close Studio Controls' : 'Open Studio Controls'
           }
           title="Studio Controls [M] · Space to Regenerate"
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-mono border cursor-pointer backdrop-blur-md transition-all duration-300 ${
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-mono border cursor-pointer backdrop-blur-md transition-opacity duration-300 ${
             isControlMenuOpen
-              ? 'opacity-100 scale-100'
-              : 'opacity-45 hover:opacity-100 focus:opacity-100 hover:scale-[1.02]'
+              ? 'opacity-100'
+              : 'opacity-45 hover:opacity-100 focus:opacity-100'
           }`}
           style={{
             backgroundColor: `${activeStyle.bgElevated}D9`,

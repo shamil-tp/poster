@@ -3,20 +3,13 @@ import { GeneratedPosterStyle } from '../utils/posterStyles';
 
 interface PosterMotifLayerProps {
   style: GeneratedPosterStyle;
-  pointer: { x: number; y: number; active: boolean; influence?: number };
-  interactivePulse: number;
+  pointer?: { x: number; y: number; active: boolean; influence?: number };
+  interactivePulse?: number;
 }
 
 export const PosterMotifLayer: React.FC<PosterMotifLayerProps> = ({
   style,
-  pointer,
-  interactivePulse,
 }) => {
-  const inf = pointer.influence !== undefined ? pointer.influence : pointer.active ? 1 : 0;
-  const shiftX = (pointer.x - 0.5) * 32 * inf;
-  const shiftY = (pointer.y - 0.5) * 32 * inf;
-  const rot = (pointer.x - 0.5) * 6 * inf + (interactivePulse % 2 === 1 ? 2 : 0);
-
   const renderMotifSvg = () => {
     switch (style.motif) {
       case 'laurel-columns':
@@ -54,7 +47,6 @@ export const PosterMotifLayer: React.FC<PosterMotifLayerProps> = ({
               style={{
                 backgroundColor: style.accentPrimary,
                 opacity: style.isDark ? 0.2 : 0.15,
-                transform: `translate3d(${(shiftX * 1.4).toFixed(2)}px, ${(shiftY * 1.4).toFixed(2)}px, 0)`,
               }}
             />
             <div
@@ -62,7 +54,6 @@ export const PosterMotifLayer: React.FC<PosterMotifLayerProps> = ({
               style={{
                 backgroundColor: style.accentSecondary,
                 opacity: style.isDark ? 0.18 : 0.14,
-                transform: `translate3d(${(-shiftX * 1.2).toFixed(2)}px, ${(-shiftY * 1.2).toFixed(2)}px, 0)`,
               }}
             />
           </div>
@@ -219,23 +210,19 @@ export const PosterMotifLayer: React.FC<PosterMotifLayerProps> = ({
       <div
         className="w-full h-full"
         style={{
-          transform: `translate3d(${(shiftX * 0.55).toFixed(2)}px, ${(
-            shiftY * 0.55
-          ).toFixed(2)}px, 0) rotate(${(rot * 0.14).toFixed(2)}deg)`,
-          willChange: 'transform',
+          transform:
+            'translate3d(calc(var(--px, 0) * -14px), calc(var(--py, 0) * -14px), 0)',
         }}
       >
         {renderMotifSvg()}
       </div>
 
-      {/* Smooth Cursor-Following Ambient Aura */}
+      {/* Smooth Cursor-Following Ambient Aura driven by CSS custom properties */}
       <div
         className="absolute inset-0"
         style={{
-          opacity: 0.08 + inf * 0.16,
-          background: `radial-gradient(560px circle at ${(pointer.x * 100).toFixed(
-            1
-          )}% ${(pointer.y * 100).toFixed(1)}%, ${style.accentPrimary}40, transparent 72%)`,
+          opacity: 0.16,
+          background: `radial-gradient(600px circle at calc(var(--cursor-x, 50) * 1%) calc(var(--cursor-y, 50) * 1%), ${style.accentPrimary}38, transparent 72%)`,
         }}
       />
     </div>

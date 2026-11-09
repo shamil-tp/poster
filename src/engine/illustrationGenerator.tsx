@@ -25,9 +25,9 @@ export function generateIllustrationConfig(
   ];
   const r = rng();
   const framingMode =
-    r < 0.58
+    r < 0.55
       ? 'integrated-portrait-sculpture'
-      : r < 0.86
+      : r < 0.85
       ? 'duotone-collage-cutout'
       : modes[2];
 
@@ -52,39 +52,35 @@ export type IllustrationFrameVariant =
   | 'arch-niche'
   | 'frameless-overlap'
   | 'polaroid-tape'
-  | 'full-bleed-backdrop';
+  | 'full-bleed-backdrop'
+  | 'stamp-seal';
 
 interface ProceduralIllustrationProps {
   artDirection: SynthesizedArtDirection;
   config: IllustrationConfig;
   photo: PortfolioPhoto;
-  pointer: { x: number; y: number; active: boolean; influence?: number };
+  pointer?: { x: number; y: number; active: boolean; influence?: number };
   onCyclePhoto: () => void;
   compact?: boolean;
   frameVariant?: IllustrationFrameVariant;
   className?: string;
+  pureVectorDefault?: boolean;
 }
 
 export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
   artDirection,
   config,
   photo,
-  pointer,
   onCyclePhoto,
   compact = false,
   frameVariant = 'default',
   className = '',
+  pureVectorDefault = false,
 }) => {
-  const [hovered, setHovered] = useState(false);
-  const [showPureVector, setShowPureVector] = useState(false);
+  const [showPureVector, setShowPureVector] = useState(
+    pureVectorDefault || config.framingMode === 'pure-procedural-totem'
+  );
   const [imgError, setImgError] = useState(false);
-  const [pulseCount, setPulseCount] = useState(0);
-
-  const inf = pointer.influence !== undefined ? pointer.influence : pointer.active ? 1 : 0;
-  const px = (pointer.x - 0.5) * 26 * inf;
-  const py = (pointer.y - 0.5) * 26 * inf;
-  const tiltX = (0.5 - pointer.y) * 8 * inf;
-  const tiltY = (pointer.x - 0.5) * 8 * inf;
 
   const getPhotoFilter = (): string => {
     switch (artDirection.photoTreatment) {
@@ -106,21 +102,13 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
     const c2 = artDirection.accentSecondary;
     const fg = artDirection.textPrimary;
     const border = artDirection.borderColor;
-    const pulseRot = (pulseCount % 4) * 15;
 
     switch (config.category) {
       case 'classical-sculpture':
       case 'ornate-engraving':
         return (
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible" fill="none">
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.45).toFixed(2)}px, ${(py * 0.45).toFixed(
-                  2
-                )}px, 0) rotate(${pulseRot * 0.25}deg)`,
-                transformOrigin: '200px 200px',
-              }}
-            >
+            <g>
               <circle cx="200" cy="200" r="176" stroke={c1} strokeWidth="1.5" strokeDasharray="6 4" />
               <circle cx="200" cy="200" r="150" stroke={border} strokeWidth="1" />
               {Array.from({ length: 24 }).map((_, i) => {
@@ -159,14 +147,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
       case 'geometric-construct':
         return (
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible" fill="none">
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.55).toFixed(2)}px, ${(py * 0.55).toFixed(
-                  2
-                )}px, 0) rotate(${pulseRot * 0.4}deg)`,
-                transformOrigin: '200px 200px',
-              }}
-            >
+            <g>
               <rect x="38" y="38" width="324" height="324" stroke={fg} strokeWidth="2.5" />
               <circle cx="140" cy="140" r="94" fill={c1} />
               <rect
@@ -199,11 +180,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
       case 'pixel-retro':
         return (
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible" fill="none">
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.65).toFixed(2)}px, ${(py * 0.65).toFixed(2)}px, 0)`,
-              }}
-            >
+            <g>
               <rect x="22" y="22" width="356" height="356" stroke={c1} strokeWidth="1.5" />
               <path d="M 22 64 L 64 22 M 336 22 L 378 64 M 22 336 L 64 378 M 336 378 L 378 336" stroke={c2} strokeWidth="2" />
               <circle cx="200" cy="200" r="134" stroke={c1} strokeWidth="1.5" strokeDasharray="12 6" />
@@ -231,11 +208,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
                 <stop offset="100%" stopColor={c2} />
               </linearGradient>
             </defs>
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.5).toFixed(2)}px, ${(py * 0.5).toFixed(2)}px, 0)`,
-              }}
-            >
+            <g>
               <circle cx="200" cy="175" r="112" fill={`url(#synthSun-${config.id})`} opacity="0.85" />
               {[195, 215, 235, 255].map((y, idx) => (
                 <rect
@@ -271,11 +244,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
       case 'zen-ceramic':
         return (
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible" fill="none">
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.4).toFixed(2)}px, ${(py * 0.4).toFixed(2)}px, 0)`,
-              }}
-            >
+            <g>
               <path
                 d="M 76 356 L 76 168 A 124 124 0 0 1 324 168 L 324 356 Z"
                 stroke={c1}
@@ -301,14 +270,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
       case 'surreal-portal':
         return (
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible" fill="none">
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.48).toFixed(2)}px, ${(py * 0.48).toFixed(
-                  2
-                )}px, 0) rotate(${((pointer.x - 0.5) * 18 * inf + pulseRot).toFixed(2)}deg)`,
-                transformOrigin: '200px 200px',
-              }}
-            >
+            <g>
               <circle cx="200" cy="200" r="160" stroke={c1} strokeWidth="2.5" />
               <circle cx="200" cy="200" r="130" stroke={c2} strokeWidth="1.5" strokeDasharray="8 6" />
               <circle cx="200" cy="200" r="88" stroke={c1} strokeWidth="2" />
@@ -327,11 +289,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
       default:
         return (
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible" fill="none">
-            <g
-              style={{
-                transform: `translate3d(${(px * 0.5).toFixed(2)}px, ${(py * 0.5).toFixed(2)}px, 0)`,
-              }}
-            >
+            <g>
               <rect x="36" y="36" width="328" height="328" stroke={c1} strokeWidth="2" />
               <circle cx="200" cy="200" r="122" fill={c1 + '22'} stroke={c1} strokeWidth="2.5" />
               <path d="M 80 320 L 320 80 M 80 80 L 320 320" stroke={c2} strokeWidth="1.5" />
@@ -342,11 +300,11 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
     }
   };
 
-  // Portrait visibility uses smooth opacity/scale rather than mounting/unmounting on hover
   const isPortraitVisible = !showPureVector && !imgError;
 
   const isCircleVariant =
     frameVariant === 'circle-medallion' ||
+    frameVariant === 'stamp-seal' ||
     config.category === 'classical-sculpture' ||
     config.category === 'ornate-engraving' ||
     config.category === 'maritime-nautical' ||
@@ -357,22 +315,23 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
     config.category === 'botanical-organic' ||
     config.category === 'zen-ceramic';
 
-  const isFrameless = frameVariant === 'frameless-overlap' || frameVariant === 'full-bleed-backdrop';
+  const isFrameless =
+    frameVariant === 'frameless-overlap' ||
+    frameVariant === 'full-bleed-backdrop' ||
+    frameVariant === 'stamp-seal';
 
   const outerShapeClasses =
-    frameVariant === 'circle-medallion'
+    frameVariant === 'circle-medallion' || frameVariant === 'stamp-seal'
       ? 'rounded-full aspect-square'
       : frameVariant === 'arch-niche'
       ? 'rounded-t-[999px]'
       : '';
 
   return (
+    /* STATIC OUTER HIT-TARGET: Never transforms or rotates on hover -> zero boundary oscillation */
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={(e) => {
         e.stopPropagation();
-        setPulseCount((c) => c + 1);
         onCyclePhoto();
       }}
       role="button"
@@ -380,13 +339,12 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          setPulseCount((c) => c + 1);
           onCyclePhoto();
         }
       }}
       aria-label={`Interactive ${artDirection.name} artwork and portrait (${photo.caption}). Click to cycle visual plate.`}
-      className={`relative group cursor-pointer select-none overflow-hidden flex items-center justify-center ${
-        compact ? 'w-full h-full' : 'w-full h-full min-h-[180px]'
+      className={`group/illus relative cursor-pointer select-none overflow-hidden flex items-center justify-center ${
+        compact ? 'w-full h-full' : 'w-full h-full min-h-[160px]'
       } ${outerShapeClasses} ${className}`}
       style={{
         backgroundColor: isFrameless ? 'transparent' : artDirection.bgElevated,
@@ -405,12 +363,6 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
               ? `3px 3px 0px ${artDirection.accentPrimary}`
               : `7px 7px 0px ${artDirection.accentPrimary}`
             : undefined,
-        transform: compact
-          ? undefined
-          : `perspective(1200px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(
-              2
-            )}deg) rotate(${config.rotationDeg.toFixed(2)}deg)`,
-        willChange: 'transform',
       }}
     >
       {/* Top Masking Tape Strip when polaroid-tape or collage-scrapbook */}
@@ -419,7 +371,9 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
           config.category === 'collage-scrapbook') && (
           <div
             aria-hidden="true"
-            className="absolute -top-2 left-1/2 -translate-x-1/2 w-24 h-6 z-30 opacity-80 rotate-[-2deg] pointer-events-none"
+            className="
+              absolute -top-2 left-1/2 -translate-x-1/2 w-24 h-6 z-30 opacity-80 -rotate-2 pointer-events-none
+            "
             style={{
               backgroundColor: artDirection.accentPrimary,
               mixBlendMode: 'multiply',
@@ -427,22 +381,26 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
           />
         )}
 
-      {/* Layer 1: Style-Specific Procedural SVG Artwork */}
+      {/* Layer 1: Style-Specific Procedural SVG Artwork (pointer-events-none, CSS-variable parallax) */}
       <div
         className={`absolute inset-0 ${
           compact ? 'p-0.5' : 'p-2 sm:p-4'
-        } pointer-events-none transition-transform duration-500 ease-out`}
+        } pointer-events-none`}
         style={{
-          transform: hovered && !compact ? 'scale(1.03)' : 'scale(1)',
+          transform: compact
+            ? undefined
+            : 'translate3d(calc(var(--px, 0) * 10px), calc(var(--py, 0) * 10px), 0)',
         }}
       >
-        {renderCategoryVectorArt()}
+        <div className="w-full h-full transition-transform duration-500 ease-out group-hover/illus:scale-[1.03]">
+          {renderCategoryVectorArt()}
+        </div>
       </div>
 
-      {/* Layer 2: Art-Directed Portrait Sculpture Integration (Always mounted to prevent hover flicker) */}
+      {/* Layer 2: Art-Directed Portrait Sculpture Integration (pointer-events-none so it never steals hover) */}
       {!imgError && (
         <div
-          className={`relative z-10 overflow-hidden ${
+          className={`relative z-10 overflow-hidden pointer-events-none ${
             compact
               ? 'w-[76%] h-[76%] border'
               : isCircleVariant
@@ -457,15 +415,10 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
           style={{
             borderColor: artDirection.accentPrimary,
             opacity: isPortraitVisible ? 1 : 0,
-            pointerEvents: isPortraitVisible ? 'auto' : 'none',
             transform: compact
               ? undefined
-              : `translate3d(${(-px * 0.42).toFixed(2)}px, ${(-py * 0.42).toFixed(
-                  2
-                )}px, 0) scale(${isPortraitVisible ? (hovered ? 1.03 : 1) : 0.92})`,
-            transition:
-              'opacity 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
-            willChange: 'transform, opacity',
+              : 'translate3d(calc(var(--px, 0) * -8px), calc(var(--py, 0) * -8px), 0)',
+            transition: 'opacity 360ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           <img
@@ -473,7 +426,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
             alt={photo.caption}
             referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover object-center transition-transform duration-700 cubic-bezier(0.22, 1, 0.36, 1) group-hover:scale-105"
+            className="w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover/illus:scale-105"
             style={{ filter: getPhotoFilter() }}
           />
           {artDirection.photoTreatment === 'duotone-accent' && (
@@ -485,14 +438,14 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
         </div>
       )}
 
-      {/* Layer 3: Discreet Gallery Plate Controls (Hidden until hover on desktop) */}
+      {/* Layer 3: Discreet Gallery Plate Controls (Appears smoothly on hover without shifting layout) */}
       {compact ? (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-black/70 px-1 py-0.5 text-[9px] font-mono text-white text-center truncate pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-black/70 px-1 py-0.5 text-[9px] font-mono text-white text-center truncate pointer-events-none opacity-0 group-hover/illus:opacity-100 transition-opacity duration-300">
           Swap
         </div>
       ) : (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-2.5 sm:p-3.5 text-white flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
-          <div className="min-w-0">
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-2.5 sm:p-3.5 text-white flex items-end justify-between gap-2 opacity-0 group-hover/illus:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
+          <div className="min-w-0 pointer-events-none">
             <div className="text-[10px] font-mono text-white/75 truncate">
               {config.subject}
             </div>
@@ -517,7 +470,7 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
               <Sparkles className="w-3 h-3 inline mr-1" />
               {showPureVector ? 'Portrait + Art' : 'Pure Vector'}
             </button>
-            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono bg-black/70 text-white border border-white/20">
+            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono bg-black/70 text-white border border-white/20 pointer-events-none">
               <Camera className="w-3 h-3" />
               <span>Plate</span>
             </span>
