@@ -94,20 +94,21 @@ export function generateCompleteDesignState(
     prev?.layout.id as LayoutArchetypeId | undefined
   );
 
+  const prevEnsembleIds =
+    prev?.illustration?.ensembleAssets
+      ?.slice(0, prev.illustration.imageCount)
+      .map((a) => a.id) || [];
+
   const excludeAssetIds = [
     ...(options?.excludeAssetIds || []),
-    ...(prev?.illustration?.primaryAsset?.id
-      ? [prev.illustration.primaryAsset.id]
-      : []),
-    ...(prev?.illustration?.secondaryAsset?.id
-      ? [prev.illustration.secondaryAsset.id]
-      : []),
+    ...prevEnsembleIds,
   ];
 
   const illustration = generateIllustrationConfig(artDirection, illusRng, {
     customAssets: options?.customAssets,
     excludeAssetIds,
     forceAssetId: options?.forceAssetId,
+    previousArrangement: prev?.illustration?.collageArrangement,
   });
 
   let projectIndex = Math.floor(dataRng() * projectCount);
@@ -131,7 +132,7 @@ export function generateCompleteDesignState(
   const skillGroupIndex = Math.floor(dataRng() * 6);
   const educationIndex = editionNumber % 2;
 
-  const comboSignature = `${artDirection.signatureId}::${layout.id}::${typography.id}::${illustration.primaryAsset.id}::proj-${projectIndex}`;
+  const comboSignature = `${artDirection.signatureId}::${layout.id}::${typography.id}::${illustration.collageArrangement}::${illustration.primaryAsset.id}-${illustration.secondaryAsset.id}::proj-${projectIndex}`;
 
   return {
     seed,

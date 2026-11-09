@@ -369,7 +369,7 @@ export default function App() {
     isKnowledgeModalOpen,
   ]);
 
-  // Clicking the illustration plate cycles to the next style-compatible illustration asset + portrait
+  // Clicking the illustration stage shuffles the multi-image ensemble, collage arrangement, and portrait
   const handleCyclePhoto = () => {
     setDesignState((prev) => {
       const nextRng = createSeededRng(prev.seed + Date.now());
@@ -379,10 +379,10 @@ export default function App() {
         {
           customAssets,
           excludeAssetIds: [
-            prev.illustration.primaryAsset.id,
-            prev.illustration.secondaryAsset.id,
-            ...recentAssetIds.slice(-5),
+            ...prev.illustration.ensembleAssets.map((a) => a.id),
+            ...recentAssetIds.slice(-4),
           ],
+          previousArrangement: prev.illustration.collageArrangement,
         }
       );
       return {
@@ -576,7 +576,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* Active Illustration Asset Indicator */}
+            {/* Active Multi-Image Collage Ensemble Indicator */}
             <div
               className="flex items-center justify-between text-[10px] font-mono px-2 py-1 border"
               style={{
@@ -586,13 +586,17 @@ export default function App() {
               }}
             >
               <span className="truncate">
-                Plate: {designState.illustration.primaryAsset.title}
+                {designState.illustration.imageCount}x Collage:{' '}
+                {designState.illustration.ensembleAssets
+                  .slice(0, designState.illustration.imageCount)
+                  .map((a) => a.filename)
+                  .join(' + ')}
               </span>
               <span
                 className="font-semibold ml-2 shrink-0"
                 style={{ color: activeStyle.accentPrimary }}
               >
-                {designState.illustration.primaryAsset.filename}
+                {designState.illustration.collageArrangement.split('-')[0]}
               </span>
             </div>
 

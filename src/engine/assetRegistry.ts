@@ -995,8 +995,49 @@ export function scoreAssetCompatibility(
 }
 
 /**
- * Selects a primary and secondary illustration asset for a poster regeneration,
- * weighted by style compatibility while avoiding recently used assets.
+ * Scores how well a companion asset visually harmonizes with the primary asset in a multi-image collage.
+ */
+export function scoreEnsembleHarmony(
+  primary: IllustrationAssetSpec,
+  candidate: IllustrationAssetSpec
+): number {
+  if (primary.id === candidate.id) return 0;
+  let harmony = 2;
+
+  // Same visual family creates strong curatorial cohesion
+  if (candidate.visualCategory === primary.visualCategory) {
+    harmony += 10;
+  }
+
+  // Shared style compatibility
+  const sharedStyles = candidate.compatibleStyleIds.filter((id) =>
+    primary.compatibleStyleIds.includes(id)
+  ).length;
+  harmony += Math.min(8, sharedStyles * 2);
+
+  // Tone affinity
+  if (candidate.tone === primary.tone) {
+    harmony += 4;
+  } else if (
+    (primary.tone === 'warm-earth' && candidate.tone === 'light') ||
+    (primary.tone === 'light' && candidate.tone === 'warm-earth') ||
+    (primary.tone === 'dark' && candidate.tone === 'vibrant') ||
+    (primary.tone === 'vibrant' && candidate.tone === 'dark')
+  ) {
+    harmony += 3;
+  }
+
+  // Aspect ratio variety bonus for dynamic multi-scale collage layouts
+  if (Math.abs(candidate.aspectRatio - primary.aspectRatio) >= 0.08) {
+    harmony += 3;
+  }
+
+  return harmony;
+}
+
+/**
+ * Selects a cohesive 4-asset ensemble (primary, secondary, tertiary, quaternary) for a poster,
+ * weighted by style compatibility and inter-image harmony while avoiding recently used assets.
  */
 export function selectAssetsForStyle(
   artDirection: SynthesizedArtDirection,
@@ -1009,31 +1050,17 @@ export function selectAssetsForStyle(
 ): {
   primaryAsset: IllustrationAssetSpec;
   secondaryAsset: IllustrationAssetSpec;
+  ensembleAssets: IllustrationAssetSpec[];
   compatiblePoolSize: number;
 } {
   const pool = getAllIllustrationAssets(options?.customAssets);
   const excludeSet = new Set(options?.excludeAssetIds || []);
 
-  if (options?.forceAssetId) {
-    const forced = pool.find((a) => a.id === options.forceAssetId);
-    if (forced) {
-      const secondaryCandidates = pool.filter((a) => a.id !== forced.id);
-      const sec =
-        secondaryCandidates[Math.floor(rng() * secondaryCandidates.length)] || forced;
-      return {
-        primaryAsset: forced,
-        secondaryAsset: sec,
-        compatiblePoolSize: pool.length,
-      };
-    }
-  }
-
   // Score all assets against the active style
   const scored = pool.map((asset) => {
     const rawScore = scoreAssetCompatibility(asset, artDirection);
-    const penalty = excludeSet.has(asset.id) ? 0.12 : 1;
-    // Add slight seeded jitter so styles with multiple high-scoring assets rotate unpredictably
-    const jitter = 0.85 + rng() * 0.35;
+    const penalty = excludeSet.has(asset.id) ? 0.14 : 1;
+    const jitter = 0.84 + rng() * 0.36;
     return {
       asset,
       weight: rawScore * penalty * jitter,
@@ -1043,37 +1070,70 @@ export function selectAssetsForStyle(
 
   scored.sort((a, b) => b.weight - a.weight);
 
-  // Pick from top compatible candidates (top 6 non-excluded, or fallback to all)
-  const topCandidates = scored.slice(0, Math.min(7, scored.length));
-  const totalWeight = topCandidates.reduce((acc, item) => acc + item.weight, 0);
-  let pick = rng() * totalWeight;
-  let primaryAsset = topCandidates[0].asset;
+  let primaryAsset = scored[0].asset;
 
-  for (const candidate of topCandidates) {
-    pick -= candidate.weight;
-    if (pick <= 0) {
-      primaryAsset = candidate.asset;
-      break;
+  if (options?.forceAssetId) {
+    const forced = pool.find((a) => a.id === options.forceAssetId);
+    if (forced) {
+      primaryAsset = forced;
+    }
+  } else {
+    const topCandidates = scored.slice(0, Math.min(7, scored.length));
+    const totalWeight = topCandidates.reduce((acc, item) => acc + item.weight, 0);
+    let pick = rng() * totalWeight;
+    for (const candidate of topCandidates) {
+      pick -= candidate.weight;
+      if (pick <= 0) {
+        primaryAsset = candidate.asset;
+        break;
+      }
     }
   }
 
-  // Pick a distinct secondary asset for layered/collage compositions
-  const secondaryCandidates = scored.filter(
-    (item) => item.asset.id !== primaryAsset.id && !excludeSet.has(item.asset.id)
-  );
-  const secPool =
-    secondaryCandidates.length > 0
-      ? secondaryCandidates.slice(0, Math.min(6, secondaryCandidates.length))
-      : scored.filter((item) => item.asset.id !== primaryAsset.id);
+  // Build a 4-asset ensemble by scoring remaining candidates on both style fit AND visual harmony with primaryAsset
+  const pickedIds = new Set<string>([primaryAsset.id]);
+  const ensembleAssets: IllustrationAssetSpec[] = [primaryAsset];
 
-  const secIndex = Math.floor(rng() * Math.max(1, secPool.length));
-  const secondaryAsset = secPool[secIndex]?.asset || primaryAsset;
+  const companionScored = pool
+    .filter((a) => a.id !== primaryAsset.id)
+    .map((candidate) => {
+      const styleScore = scoreAssetCompatibility(candidate, artDirection);
+      const harmonyScore = scoreEnsembleHarmony(primaryAsset, candidate);
+      const penalty = excludeSet.has(candidate.id) ? 0.25 : 1;
+      const jitter = 0.82 + rng() * 0.38;
+      return {
+        asset: candidate,
+        weight: (styleScore + harmonyScore) * penalty * jitter,
+      };
+    })
+    .sort((a, b) => b.weight - a.weight);
 
+  for (let slot = 1; slot < 4; slot++) {
+    const available = companionScored.filter((c) => !pickedIds.has(c.asset.id));
+    if (available.length === 0) break;
+    const windowSize = Math.min(6, available.length);
+    const slice = available.slice(0, windowSize);
+    const sliceWeight = slice.reduce((acc, item) => acc + item.weight, 0);
+    let roll = rng() * sliceWeight;
+    let chosen = slice[0].asset;
+    for (const item of slice) {
+      roll -= item.weight;
+      if (roll <= 0) {
+        chosen = item.asset;
+        break;
+      }
+    }
+    pickedIds.add(chosen.id);
+    ensembleAssets.push(chosen);
+  }
+
+  const secondaryAsset = ensembleAssets[1] || primaryAsset;
   const compatiblePoolSize = scored.filter((s) => s.rawScore >= 10).length;
 
   return {
     primaryAsset,
     secondaryAsset,
+    ensembleAssets,
     compatiblePoolSize: Math.max(1, compatiblePoolSize),
   };
 }

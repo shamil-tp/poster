@@ -54,20 +54,24 @@ test('all 39 supplied illustration assets (img1..img39) are cataloged with valid
   }
 });
 
-test('every one of the 50 design styles selects compatible primary and distinct secondary illustration assets', () => {
+test('every one of the 50 design styles selects a cohesive 4-asset ensemble without duplicates', () => {
   const rng = createSeededRng(777);
   for (let styleId = 1; styleId <= 50; styleId++) {
     const state = generateCompleteDesignState(styleId * 997, styleId, {
       forceStyleId: styleId,
       forceHybrid: false,
     });
-    const { primaryAsset, secondaryAsset, compatiblePoolSize } = selectAssetsForStyle(
-      state.artDirection,
-      rng
-    );
+    const {
+      primaryAsset,
+      secondaryAsset,
+      ensembleAssets,
+      compatiblePoolSize,
+    } = selectAssetsForStyle(state.artDirection, rng);
     assert.ok(primaryAsset.id.startsWith('asset-img'));
     assert.ok(secondaryAsset.id.startsWith('asset-img'));
     assert.notEqual(primaryAsset.id, secondaryAsset.id);
+    assert.equal(ensembleAssets.length, 4);
+    assert.equal(new Set(ensembleAssets.map((a) => a.id)).size, 4);
     assert.ok(compatiblePoolSize >= 1);
   }
 });
@@ -139,9 +143,12 @@ test('generateCompleteDesignState is deterministic for a given seed and supports
   assert.equal(layoutMutated.layout.id, LAYOUT_ARCHETYPES[5 % LAYOUT_ARCHETYPES.length].id);
 });
 
-test('consecutive regenerations produce distinct styles, layouts, projects, photos, and diverse illustration assets', () => {
+test('consecutive regenerations produce distinct styles, layouts, collage arrangements, and randomized multi-image counts', () => {
   let prev = generateCompleteDesignState(1001, 1);
-  const usedAssets = new Set<string>([prev.illustration.primaryAsset.id]);
+  const usedAssets = new Set<string>(prev.illustration.ensembleAssets.map((a) => a.id));
+  const usedArrangements = new Set<string>([prev.illustration.collageArrangement]);
+  const seenImageCounts = new Set<number>([prev.illustration.imageCount]);
+
   for (let i = 2; i <= 30; i++) {
     const next = generateCompleteDesignState(1001 + i * 7919, i, {
       previousState: prev,
@@ -151,11 +158,20 @@ test('consecutive regenerations produce distinct styles, layouts, projects, phot
     assert.notEqual(next.artDirection.signatureId, prev.artDirection.signatureId);
     assert.notEqual(next.projectIndex, prev.projectIndex);
     assert.notEqual(next.photoIndex, prev.photoIndex);
-    usedAssets.add(next.illustration.primaryAsset.id);
+    assert.notEqual(
+      next.illustration.collageArrangement,
+      prev.illustration.collageArrangement
+    );
+    for (const a of next.illustration.ensembleAssets) {
+      usedAssets.add(a.id);
+    }
+    usedArrangements.add(next.illustration.collageArrangement);
+    seenImageCounts.add(next.illustration.imageCount);
     prev = next;
   }
-  // Across 30 regenerations, at least 12 distinct assets should be selected
-  assert.ok(usedAssets.size >= 12, `Expected >= 12 distinct assets across 30 regenerations, got ${usedAssets.size}`);
+  assert.ok(usedAssets.size >= 20, `Expected >= 20 distinct assets across 30 ensembles, got ${usedAssets.size}`);
+  assert.ok(usedArrangements.size >= 6, `Expected >= 6 distinct collage arrangements, got ${usedArrangements.size}`);
+  assert.ok(seenImageCounts.size >= 3, `Expected >= 3 distinct imageCount values (1..4), got ${seenImageCounts.size}`);
 });
 
 test('legacy createHybridDesignStyle and generateUniquePosterRecipe remain functional', () => {
