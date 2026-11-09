@@ -994,11 +994,17 @@ export const ProceduralIllustration: React.FC<ProceduralIllustrationProps> = ({
 
       {/* Layer 4: Discreet Gallery Collage Controls (Appears smoothly on hover without shifting layout) */}
       {compact ? (
-        <div className="absolute inset-x-0 bottom-0 z-30 bg-black/75 px-1 py-0.5 text-[9px] font-mono text-white text-center truncate pointer-events-none opacity-0 group-hover/illus:opacity-100 transition-opacity duration-300">
+        <div
+          data-export-ignore="true"
+          className="absolute inset-x-0 bottom-0 z-30 bg-black/75 px-1 py-0.5 text-[9px] font-mono text-white text-center truncate pointer-events-none opacity-0 group-hover/illus:opacity-100 transition-opacity duration-300"
+        >
           {assetsToRender.length}x Art
         </div>
       ) : (
-        <div className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-2 sm:p-2.5 text-white flex items-end justify-between gap-2 opacity-0 group-hover/illus:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
+        <div
+          data-export-ignore="true"
+          className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-2 sm:p-2.5 text-white flex items-end justify-between gap-2 opacity-0 group-hover/illus:opacity-100 focus-within:opacity-100 transition-opacity duration-300"
+        >
           <div className="min-w-0 pointer-events-none">
             <div className="text-[10px] font-mono text-white/80 truncate">
               {assetsToRender.map((a) => a.filename).join(' + ')}

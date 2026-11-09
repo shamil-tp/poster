@@ -20,6 +20,12 @@ import {
   createExpandableAssetSpec,
   getAllIllustrationAssets,
 } from '../engine/assetRegistry';
+import {
+  extractUsedFontFamilies,
+  filterFontFaceBlocks,
+  convertViewportUnitsInCss,
+  computeExportDimensions,
+} from './posterExporter';
 
 test('all 50 enriched design styles exist with illustration subjects, compatible hybrids, and motion personalities', () => {
   assert.equal(DESIGN_STYLES_50.length, 50);
@@ -201,3 +207,54 @@ test('parsePortfolioMarkdown and selectPosterDataSlice accurately filter Shamil 
   });
   assert.equal(rewindSlice.focalProject.id, 'rewind');
 });
+
+test('posterExporter helpers accurately extract custom fonts, filter @font-face rules, convert viewport units, and compute high-DPI dimensions', () => {
+  const families = extractUsedFontFamilies([
+    "'Cinzel', 'Cormorant Garamond', Georgia, serif",
+    "'JetBrains Mono', monospace",
+    '"Cinzel", sans-serif',
+  ]);
+  assert.deepEqual(families, ['Cinzel', 'Cormorant Garamond', 'JetBrains Mono']);
+
+  const sampleGoogleCss = `
+    @font-face {
+      font-family: 'Cinzel';
+      src: url(https://fonts.gstatic.com/s/cinzel/v23/abc.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Bangers';
+      src: url(https://fonts.gstatic.com/s/bangers/v20/xyz.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url(https://fonts.gstatic.com/s/jetbrainsmono/v18/def.woff2) format('woff2');
+    }
+  `;
+  const filteredBlocks = filterFontFaceBlocks(sampleGoogleCss, [
+    'Cinzel',
+    'JetBrains Mono',
+  ]);
+  assert.equal(filteredBlocks.length, 2);
+  assert.ok(filteredBlocks[0].includes('Cinzel'));
+  assert.ok(filteredBlocks[1].includes('JetBrains Mono'));
+
+  const convertedCss = convertViewportUnitsInCss(
+    '.hero { width: 100vw; height: 100dvh; max-width: 40vw; }',
+    1440,
+    900
+  );
+  assert.equal(
+    convertedCss,
+    '.hero { width: 1440.00px; height: 900.00px; max-width: 576.00px; }'
+  );
+
+  const dims = computeExportDimensions(1440, 900, 2);
+  assert.deepEqual(dims, {
+    width: 1440,
+    height: 900,
+    exportWidth: 2880,
+    exportHeight: 1800,
+    scale: 2,
+  });
+});
+

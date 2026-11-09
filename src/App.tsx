@@ -38,7 +38,11 @@ import {
   discoverAdditionalAssets,
 } from './engine/assetRegistry';
 import { generateIllustrationConfig } from './engine/illustrationGenerator';
-import { exportPosterAsPng } from './utils/posterExporter';
+import {
+  exportRenderedPoster,
+  prewarmPosterFonts,
+  PosterExportFormat,
+} from './utils/posterExporter';
 import { PosterCanvas } from './components/PosterCanvas';
 import { StyleStudioModal } from './components/StyleStudioModal';
 import { KnowledgeStudioModal } from './components/KnowledgeStudioModal';
@@ -484,22 +488,74 @@ export default function App() {
 
   const activeStyle = designState.artDirection;
 
-  const handleDownloadPoster = async () => {
-    try {
-      setDownloadStatus('Rendering 1920×1080 PNG...');
-      const filename = await exportPosterAsPng(
-        activeStyle,
-        activeSlice,
-        kb.identity,
-        designState.illustration.primaryAsset
-      );
-      setDownloadStatus(`Downloaded ${filename}`);
-      setTimeout(() => setDownloadStatus(null), 4000);
-    } catch {
-      setDownloadStatus('Export complete');
-      setTimeout(() => setDownloadStatus(null), 3000);
-    }
-  };
+  // Pre-warm the active poster's Google Fonts in memory so exporting is instant
+  useEffect(() => {
+    prewarmPosterFonts([
+      designState.typography.fontDisplay,
+      designState.typography.fontBody,
+      designState.typography.fontMono,
+      activeStyle.fontDisplay,
+      activeStyle.fontBody,
+      activeStyle.fontMono,
+    ]);
+  }, [
+    designState.typography.fontDisplay,
+    designState.typography.fontBody,
+    designState.typography.fontMono,
+    activeStyle.fontDisplay,
+    activeStyle.fontBody,
+    activeStyle.fontMono,
+  ]);
+
+  const handleDownloadPoster = useCallback(
+    async (format: PosterExportFormat = 'png') => {
+      try {
+        const label = format === 'jpeg' ? 'JPG' : 'PNG';
+        setDownloadStatus(`Capturing Hi-Res ${label}...`);
+        const result = await exportRenderedPoster(activeStyle, {
+          format,
+          scale: 2,
+          quality: 0.95,
+        });
+        setDownloadStatus(
+          `Saved ${result.exportWidth}×${result.exportHeight} ${label}`
+        );
+        setTimeout(() => setDownloadStatus(null), 4000);
+      } catch {
+        setDownloadStatus('Export failed — please retry');
+        setTimeout(() => setDownloadStatus(null), 3000);
+      }
+    },
+    [activeStyle]
+  );
+
+  // [D] keyboard shortcut to download poster PNG directly
+  useEffect(() => {
+    const onDownloadShortcut = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (
+        (e.key === 'd' || e.key === 'D') &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !isStyleModalOpen &&
+        !isKnowledgeModalOpen
+      ) {
+        e.preventDefault();
+        handleDownloadPoster('png');
+      }
+    };
+    window.addEventListener('keydown', onDownloadShortcut);
+    return () => window.removeEventListener('keydown', onDownloadShortcut);
+  }, [handleDownloadPoster, isStyleModalOpen, isKnowledgeModalOpen]);
 
   return (
     <div
@@ -778,30 +834,53 @@ export default function App() {
               </button>
             </div>
 
-            {/* Primary Export Action */}
-            <button
-              type="button"
-              onClick={handleDownloadPoster}
-              aria-label="Download Poster PNG"
-              className="w-full py-2 px-3 text-xs font-semibold transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1.5"
-              style={{
-                backgroundColor: activeStyle.accentPrimary,
-                color: activeStyle.isDark ? '#09090B' : '#FFFFFF',
-                fontFamily: designState.typography.fontMono,
-              }}
-            >
-              {downloadStatus ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{downloadStatus}</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Poster (1920×1080)</span>
-                </>
-              )}
-            </button>
+            {/* Primary Export Actions (Pixel-Perfect Rendered Poster Capture: PNG & JPG) */}
+            <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPoster('png')}
+                  aria-label="Download Poster PNG"
+                  className="col-span-2 py-2 px-3 text-xs font-semibold transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1.5"
+                  style={{
+                    backgroundColor: activeStyle.accentPrimary,
+                    color: activeStyle.isDark ? '#09090B' : '#FFFFFF',
+                    fontFamily: designState.typography.fontMono,
+                  }}
+                >
+                  {downloadStatus ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span className="truncate">{downloadStatus}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download PNG [D]</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPoster('jpeg')}
+                  aria-label="Download Poster JPG"
+                  className="col-span-1 py-2 px-2.5 text-xs font-semibold border transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1"
+                  style={{
+                    backgroundColor: activeStyle.bgSurface,
+                    borderColor: activeStyle.accentPrimary,
+                    color: activeStyle.textPrimary,
+                    fontFamily: designState.typography.fontMono,
+                  }}
+                >
+                  <Download
+                    className="w-3.5 h-3.5"
+                    style={{ color: activeStyle.accentPrimary }}
+                  />
+                  <span>JPG</span>
+                </button>
+              </div>
+            </div>
 
             <div
               className="text-[10px] font-mono text-center pt-1 border-t"
@@ -810,7 +889,7 @@ export default function App() {
                 color: activeStyle.textSecondary,
               }}
             >
-              Shortcuts: [Space] New Poster · [T] Type · [L] Layout · [M] Menu
+              Shortcuts: [Space] New · [T] Type · [L] Layout · [D] Save · [M] Menu
             </div>
           </div>
         )}
