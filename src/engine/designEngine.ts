@@ -12,6 +12,7 @@ import {
   generateIllustrationConfig,
   IllustrationConfig,
 } from './illustrationGenerator';
+import { IllustrationAssetSpec } from './assetRegistry';
 
 /**
  * Deterministic seeded PRNG (Mulberry32) so any generated seed produces a reproducible
@@ -53,6 +54,9 @@ export function generateCompleteDesignState(
     forceHybrid?: boolean;
     typeOverrideIndex?: number;
     layoutOverrideIndex?: number;
+    forceAssetId?: string;
+    excludeAssetIds?: string[];
+    customAssets?: IllustrationAssetSpec[];
     previousState?: CompleteDesignState;
     projectCount?: number;
     photoCount?: number;
@@ -90,7 +94,21 @@ export function generateCompleteDesignState(
     prev?.layout.id as LayoutArchetypeId | undefined
   );
 
-  const illustration = generateIllustrationConfig(artDirection, illusRng);
+  const excludeAssetIds = [
+    ...(options?.excludeAssetIds || []),
+    ...(prev?.illustration?.primaryAsset?.id
+      ? [prev.illustration.primaryAsset.id]
+      : []),
+    ...(prev?.illustration?.secondaryAsset?.id
+      ? [prev.illustration.secondaryAsset.id]
+      : []),
+  ];
+
+  const illustration = generateIllustrationConfig(artDirection, illusRng, {
+    customAssets: options?.customAssets,
+    excludeAssetIds,
+    forceAssetId: options?.forceAssetId,
+  });
 
   let projectIndex = Math.floor(dataRng() * projectCount);
   if (prev && projectCount > 1 && projectIndex === prev.projectIndex) {
@@ -113,7 +131,7 @@ export function generateCompleteDesignState(
   const skillGroupIndex = Math.floor(dataRng() * 6);
   const educationIndex = editionNumber % 2;
 
-  const comboSignature = `${artDirection.signatureId}::${layout.id}::${typography.id}::proj-${projectIndex}`;
+  const comboSignature = `${artDirection.signatureId}::${layout.id}::${typography.id}::${illustration.primaryAsset.id}::proj-${projectIndex}`;
 
   return {
     seed,

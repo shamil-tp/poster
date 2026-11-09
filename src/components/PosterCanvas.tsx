@@ -9,7 +9,10 @@ import {
 import { CompleteDesignState } from '../engine/designEngine';
 import { PosterDataSlice, PortfolioIdentity } from '../utils/knowledgeParser';
 import { PosterMotifLayer } from './PosterMotifLayer';
-import { ProceduralIllustration } from '../engine/illustrationGenerator';
+import {
+  ProceduralIllustration,
+  PosterBackgroundAssetLayer,
+} from '../engine/illustrationGenerator';
 import { InteractiveHeadline } from './InteractiveHeadline';
 
 interface PosterCanvasProps {
@@ -417,7 +420,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
     align: 'left' | 'center' | 'right' = 'left',
     showLocationLine = true
   ) => (
-    <div className="shrink-0 flex items-center justify-between gap-3 pr-10 sm:pr-14 lg:pr-0">
+    <div className="shrink-0 flex items-center justify-between gap-3 pr-14 sm:pr-20 lg:pr-24">
       <div className="lg:hidden w-14 h-14 sm:w-20 sm:h-20 shrink-0">
         <ProceduralIllustration
           artDirection={style}
@@ -707,7 +710,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
               {/* Giant Numeral + Stamp Emblem */}
               <div className="hidden lg:flex lg:col-span-4 flex-col items-start justify-center relative">
                 <div
-                  className="text-[8rem] xl:text-[11rem] font-black leading-[0.8] tracking-tighter select-none"
+                  className="text-[6.5rem] xl:text-[8.5rem] font-black leading-[0.8] tracking-tighter select-none"
                   style={{
                     fontFamily: typography.fontDisplay,
                     color: style.accentPrimary,
@@ -715,7 +718,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
                 >
                   0{slice.focalProject.index}
                 </div>
-                <div className="w-36 h-36 mt-3">
+                <div className="w-48 h-48 xl:w-56 xl:h-56 mt-3">
                   <ProceduralIllustration
                     artDirection={style}
                     config={illustration}
@@ -1358,6 +1361,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
       data-testid="poster-canvas"
       data-style-slug={style.slug}
       data-layout-id={layout.id}
+      data-asset-id={illustration.primaryAsset.id}
       data-edition={style.editionNumber}
       className="relative flex-1 w-full h-full min-h-0 overflow-hidden flex flex-col justify-between transition-colors duration-500"
       style={{
@@ -1369,6 +1373,9 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
     >
       {/* Background SVG & Ambient Motif Layer (driven by CSS variables, zero re-renders) */}
       <PosterMotifLayer style={style} />
+
+      {/* Ambient Edge-to-Edge / Off-Grid Supplied Illustration Layer */}
+      <PosterBackgroundAssetLayer artDirection={style} config={illustration} />
 
       {/* Render the active Designer World directly without a repetitive master frame */}
       {renderDesignerWorld()}

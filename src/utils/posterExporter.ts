@@ -41,7 +41,8 @@ function wrapCanvasText(
 export async function exportPosterAsPng(
   style: GeneratedPosterStyle,
   slice: PosterDataSlice,
-  identity: PortfolioIdentity
+  identity: PortfolioIdentity,
+  primaryAsset?: { url: string; title: string }
 ): Promise<string> {
   const width = 1920;
   const height = 1080;
@@ -194,7 +195,7 @@ export async function exportPosterAsPng(
     1
   );
 
-  // 7. Right Column: Portrait Frame + Style DNA
+  // 7. Right Column: Illustration Asset Plate + Style DNA
   const imgX = 1188;
   const imgY = 172;
   const imgW = 636;
@@ -208,14 +209,17 @@ export async function exportPosterAsPng(
   ctx.fillStyle = style.bgSurface;
   ctx.fillRect(imgX, imgY, imgW, imgH);
 
-  // Load portrait image safely
+  const imageUrl = primaryAsset?.url || slice.photo.url;
+  const imageCaption = primaryAsset?.title || slice.photo.caption;
+
+  // Load illustration or portrait image safely
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
       el.crossOrigin = 'anonymous';
       el.onload = () => resolve(el);
       el.onerror = (err) => reject(err);
-      el.src = slice.photo.url;
+      el.src = imageUrl;
     });
 
     // Cover crop calculation
@@ -241,7 +245,7 @@ export async function exportPosterAsPng(
   // Caption under image
   ctx.fillStyle = style.textPrimary;
   ctx.font = `600 20px ${style.fontDisplay}`;
-  ctx.fillText(slice.photo.caption, imgX, bottomY);
+  ctx.fillText(imageCaption, imgX, bottomY);
 
   ctx.fillStyle = style.textSecondary;
   ctx.font = `400 17px ${style.fontBody}`;

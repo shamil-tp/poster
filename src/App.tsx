@@ -28,7 +28,16 @@ import {
 import {
   generateCompleteDesignState,
   CompleteDesignState,
+  createSeededRng,
 } from './engine/designEngine';
+import {
+  IllustrationAssetSpec,
+  loadCustomIllustrationAssets,
+  saveCustomIllustrationAssets,
+  getAllIllustrationAssets,
+  discoverAdditionalAssets,
+} from './engine/assetRegistry';
+import { generateIllustrationConfig } from './engine/illustrationGenerator';
 import { exportPosterAsPng } from './utils/posterExporter';
 import { PosterCanvas } from './components/PosterCanvas';
 import { StyleStudioModal } from './components/StyleStudioModal';
@@ -36,6 +45,7 @@ import { KnowledgeStudioModal } from './components/KnowledgeStudioModal';
 
 const STORAGE_SEEN_KEY = 'shamil_tp_poster_seen_signatures_v2';
 const STORAGE_CUSTOM_PHOTOS_KEY = 'shamil_tp_poster_custom_photos_v1';
+const STORAGE_RECENT_ASSETS_KEY = 'shamil_tp_poster_recent_assets_v1';
 
 function loadSeenSignatures(): string[] {
   try {
@@ -51,6 +61,28 @@ function loadSeenSignatures(): string[] {
 function saveSeenSignatures(sigs: string[]) {
   try {
     localStorage.setItem(STORAGE_SEEN_KEY, JSON.stringify(sigs.slice(-400)));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function loadRecentAssetIds(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_RECENT_ASSETS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentAssetIds(ids: string[]) {
+  try {
+    localStorage.setItem(
+      STORAGE_RECENT_ASSETS_KEY,
+      JSON.stringify(ids.slice(-12))
+    );
   } catch {
     // Ignore storage quota errors
   }
@@ -72,6 +104,17 @@ export default function App() {
   const [customPhotos, setCustomPhotos] = useState<PortfolioPhoto[]>(() =>
     loadCustomPhotos()
   );
+  const [customAssets, setCustomAssets] = useState<IllustrationAssetSpec[]>(() =>
+    loadCustomIllustrationAssets()
+  );
+  const [recentAssetIds, setRecentAssetIds] = useState<string[]>(() =>
+    loadRecentAssetIds()
+  );
+
+  const allIllustrationAssets = useMemo(
+    () => getAllIllustrationAssets(customAssets),
+    [customAssets]
+  );
 
   // Parse knowledge base from .md + custom photos
   const kb = useMemo(
@@ -79,7 +122,7 @@ export default function App() {
     [rawMarkdown, customPhotos]
   );
 
-  // Fetch the full attached .md file at runtime to keep rawMarkdown synced
+  // Fetch the full attached .md file and run expandable asset discovery on mount
   useEffect(() => {
     fetch('/assets/aistudio/SHAMIL_TP_PORTFOLIO_KNOWLEDGE_BASE_a54d24ce.md')
       .then((res) => (res.ok ? res.text() : null))
@@ -91,6 +134,14 @@ export default function App() {
       .catch(() => {
         // Fallback already loaded via INITIAL_RAW_MARKDOWN
       });
+
+    discoverAdditionalAssets()
+      .then((discovered) => {
+        if (discovered.length > 0) {
+          setCustomAssets((prev) => [...discovered, ...prev]);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const [seenSignatures, setSeenSignatures] = useState<string[]>(() =>
@@ -99,17 +150,25 @@ export default function App() {
   const [typeOverrideCounter, setTypeOverrideCounter] = useState<number>(0);
   const [layoutOverrideCounter, setLayoutOverrideCounter] = useState<number>(0);
 
-  // Generate fresh deterministic seed on every page refresh
+  // Generate fresh deterministic seed on every page refresh, avoiding recently used assets
   const [designState, setDesignState] = useState<CompleteDesignState>(() => {
     const initialSeen = loadSeenSignatures();
+    const initialRecentAssets = loadRecentAssetIds();
+    const initialCustomAssets = loadCustomIllustrationAssets();
     const edition = initialSeen.length + 1;
     const initialSeed =
       Math.floor(Math.random() * 900000) + edition * 7919 + (Date.now() % 10000);
     const state = generateCompleteDesignState(initialSeed, edition, {
       projectCount: 12,
       photoCount: 3 + loadCustomPhotos().length,
+      customAssets: initialCustomAssets,
+      excludeAssetIds: initialRecentAssets.slice(-8),
     });
     saveSeenSignatures([...initialSeen, state.comboSignature]);
+    saveRecentAssetIds([
+      ...initialRecentAssets,
+      state.illustration.primaryAsset.id,
+    ]);
     return state;
   });
 
@@ -120,7 +179,14 @@ export default function App() {
       saveSeenSignatures(next);
       return next;
     });
-  }, [designState.comboSignature]);
+    setRecentAssetIds((prev) => {
+      const primaryId = designState.illustration.primaryAsset.id;
+      if (prev[prev.length - 1] === primaryId) return prev;
+      const next = [...prev.filter((id) => id !== primaryId), primaryId].slice(-12);
+      saveRecentAssetIds(next);
+      return next;
+    });
+  }, [designState.comboSignature, designState.illustration.primaryAsset.id]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isControlMenuOpen, setIsControlMenuOpen] = useState(false);
@@ -142,12 +208,13 @@ export default function App() {
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, [isControlMenuOpen]);
 
-  // A. Complete Design Regeneration (New Seed -> New Style/Hybrid, New Layout, New Typography, New Illustration, New Dossier)
+  // A. Complete Design Regeneration (New Seed -> New Style/Hybrid, New Layout, New Typography, New Asset Combination, New Dossier)
   const handleRegenerateDesign = useCallback(
     (options?: {
       forceStyleId?: number;
       forceSecondaryStyleId?: number;
       forceHybrid?: boolean;
+      forceAssetId?: string;
     }) => {
       setTypeOverrideCounter(0);
       setLayoutOverrideCounter(0);
@@ -159,6 +226,8 @@ export default function App() {
           (Date.now() % 10000);
         return generateCompleteDesignState(nextSeed, nextEdition, {
           ...options,
+          customAssets,
+          excludeAssetIds: recentAssetIds.slice(-8),
           previousState: prev,
           projectCount: kb.projects.length,
           photoCount: kb.photos.length,
@@ -166,7 +235,7 @@ export default function App() {
       });
       setDownloadStatus(null);
     },
-    [kb.projects.length, kb.photos.length]
+    [kb.projects.length, kb.photos.length, customAssets, recentAssetIds]
   );
 
   // E. Independent Typography Randomization (Preserves current style, layout, and illustration)
@@ -181,6 +250,7 @@ export default function App() {
             typeOverrideIndex: nextCount,
             layoutOverrideIndex:
               layoutOverrideCounter > 0 ? layoutOverrideCounter : undefined,
+            customAssets,
             projectCount: kb.projects.length,
             photoCount: kb.photos.length,
           }
@@ -192,7 +262,7 @@ export default function App() {
       });
       return nextCount;
     });
-  }, [kb.projects.length, kb.photos.length, layoutOverrideCounter]);
+  }, [kb.projects.length, kb.photos.length, layoutOverrideCounter, customAssets]);
 
   // F. Independent Layout Randomization (Preserves current style, typography, and illustration)
   const handleRandomizeLayout = useCallback(() => {
@@ -206,6 +276,7 @@ export default function App() {
             typeOverrideIndex:
               typeOverrideCounter > 0 ? typeOverrideCounter : undefined,
             layoutOverrideIndex: nextCount,
+            customAssets,
             projectCount: kb.projects.length,
             photoCount: kb.photos.length,
           }
@@ -217,7 +288,7 @@ export default function App() {
       });
       return nextCount;
     });
-  }, [kb.projects.length, kb.photos.length, typeOverrideCounter]);
+  }, [kb.projects.length, kb.photos.length, typeOverrideCounter, customAssets]);
 
   // G. Fullscreen Toggle
   const handleToggleFullscreen = useCallback(() => {
@@ -298,11 +369,69 @@ export default function App() {
     isKnowledgeModalOpen,
   ]);
 
+  // Clicking the illustration plate cycles to the next style-compatible illustration asset + portrait
   const handleCyclePhoto = () => {
-    setDesignState((prev) => ({
-      ...prev,
-      photoIndex: (prev.photoIndex + 1) % kb.photos.length,
-    }));
+    setDesignState((prev) => {
+      const nextRng = createSeededRng(prev.seed + Date.now());
+      const nextIllustration = generateIllustrationConfig(
+        prev.artDirection,
+        nextRng,
+        {
+          customAssets,
+          excludeAssetIds: [
+            prev.illustration.primaryAsset.id,
+            prev.illustration.secondaryAsset.id,
+            ...recentAssetIds.slice(-5),
+          ],
+        }
+      );
+      return {
+        ...prev,
+        illustration: nextIllustration,
+        photoIndex: (prev.photoIndex + 1) % kb.photos.length,
+      };
+    });
+  };
+
+  const handleSelectAsset = (assetId: string) => {
+    setDesignState((prev) => {
+      const nextRng = createSeededRng(prev.seed ^ 0x99887766);
+      const nextIllustration = generateIllustrationConfig(
+        prev.artDirection,
+        nextRng,
+        {
+          customAssets,
+          forceAssetId: assetId,
+        }
+      );
+      return {
+        ...prev,
+        illustration: nextIllustration,
+      };
+    });
+  };
+
+  const handleAddCustomAsset = (newAsset: IllustrationAssetSpec) => {
+    setCustomAssets((prev) => {
+      const updated = [newAsset, ...prev];
+      saveCustomIllustrationAssets(updated);
+      return updated;
+    });
+    setDesignState((prev) => {
+      const nextRng = createSeededRng(prev.seed ^ 0x55443322);
+      const nextIllustration = generateIllustrationConfig(
+        prev.artDirection,
+        nextRng,
+        {
+          customAssets: [newAsset, ...customAssets],
+          forceAssetId: newAsset.id,
+        }
+      );
+      return {
+        ...prev,
+        illustration: nextIllustration,
+      };
+    });
   };
 
   const handleCycleProject = () => {
@@ -361,7 +490,8 @@ export default function App() {
       const filename = await exportPosterAsPng(
         activeStyle,
         activeSlice,
-        kb.identity
+        kb.identity,
+        designState.illustration.primaryAsset
       );
       setDownloadStatus(`Downloaded ${filename}`);
       setTimeout(() => setDownloadStatus(null), 4000);
@@ -443,6 +573,26 @@ export default function App() {
               </span>
               <span style={{ color: activeStyle.textSecondary }}>
                 Edition #{String(activeStyle.editionNumber).padStart(3, '0')}
+              </span>
+            </div>
+
+            {/* Active Illustration Asset Indicator */}
+            <div
+              className="flex items-center justify-between text-[10px] font-mono px-2 py-1 border"
+              style={{
+                backgroundColor: activeStyle.bgSurface,
+                borderColor: `${activeStyle.borderColor}66`,
+                color: activeStyle.textSecondary,
+              }}
+            >
+              <span className="truncate">
+                Plate: {designState.illustration.primaryAsset.title}
+              </span>
+              <span
+                className="font-semibold ml-2 shrink-0"
+                style={{ color: activeStyle.accentPrimary }}
+              >
+                {designState.illustration.primaryAsset.filename}
               </span>
             </div>
 
@@ -582,7 +732,7 @@ export default function App() {
                   setIsControlMenuOpen(false);
                   setIsKnowledgeModalOpen(true);
                 }}
-                aria-label="Open Knowledge Base and Photo Studio"
+                aria-label="Open Illustration Asset Library and Knowledge Base"
                 className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border cursor-pointer"
                 style={{
                   backgroundColor: activeStyle.bgSurface,
@@ -595,7 +745,7 @@ export default function App() {
                   className="w-3.5 h-3.5"
                   style={{ color: activeStyle.accentPrimary }}
                 />
-                <span>Photos / .md</span>
+                <span>Assets ({allIllustrationAssets.length})</span>
               </button>
 
               <button
@@ -695,13 +845,15 @@ export default function App() {
         onRandomizeHybrid={() => handleRegenerateDesign({ forceHybrid: true })}
       />
 
-      {/* KNOWLEDGE BASE (.MD) & PHOTO UPLOAD STUDIO MODAL */}
+      {/* ILLUSTRATION ASSETS (39+), KNOWLEDGE BASE (.MD) & PHOTO STUDIO MODAL */}
       <KnowledgeStudioModal
         isOpen={isKnowledgeModalOpen}
         kb={kb}
         rawMarkdown={rawMarkdown}
         activeProjectIndex={designState.projectIndex}
         activePhotoIndex={designState.photoIndex}
+        activeAssetId={designState.illustration.primaryAsset.id}
+        allAssets={allIllustrationAssets}
         onClose={() => setIsKnowledgeModalOpen(false)}
         onSelectProject={(idx) =>
           setDesignState((prev) => ({
@@ -716,7 +868,9 @@ export default function App() {
             photoIndex: idx,
           }))
         }
+        onSelectAsset={handleSelectAsset}
         onAddCustomPhoto={handleAddCustomPhoto}
+        onAddCustomAsset={handleAddCustomAsset}
         onUpdateMarkdown={(newMd) => setRawMarkdown(newMd)}
       />
     </div>
