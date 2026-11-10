@@ -262,3 +262,92 @@ test('posterExporter helpers accurately extract custom fonts, filter @font-face 
   });
 });
 
+test('/img WebP route helpers validate RIFF WebP bytes, compute content-hash ETags, handle 304 caching, and update GitHub Camo README URLs', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const {
+    isValidWebpBuffer,
+    computeWebpContentHash,
+    buildImgResponseHeaders,
+    isConditionalRequestFresh,
+    buildCamoSafePosterUrls,
+    updateReadmePosterImageUrl,
+  } = await import('./imgRouteHeaders');
+
+  // Verify the baseline WebP banner file on disk is a genuine RIFF....WEBP image
+  const bannerPath = path.join(process.cwd(), 'public', 'assets', 'poster-banner.webp');
+  assert.ok(fs.existsSync(bannerPath), 'public/assets/poster-banner.webp should exist');
+  const bannerBuf = fs.readFileSync(bannerPath);
+  assert.equal(isValidWebpBuffer(bannerBuf), true, 'Baseline banner must have valid RIFF WEBP magic bytes');
+
+  const htmlBuf = Buffer.from('<!doctype html><html><body>not webp</body></html>');
+  assert.equal(isValidWebpBuffer(htmlBuf), false, 'HTML buffer must be rejected as non-WebP');
+
+  const { version, etag } = computeWebpContentHash(bannerBuf);
+  assert.equal(version.length, 12);
+  assert.equal(etag, `"${version}"`);
+
+  // Unversioned /img request -> must-revalidate, no-cache so stale images are never served
+  const unversionedHeaders = buildImgResponseHeaders({
+    version,
+    etag,
+    lastModified: 'Tue, 10 Nov 2026 04:00:00 GMT',
+    byteLength: bannerBuf.byteLength,
+    requestedVersion: null,
+  });
+  assert.equal(unversionedHeaders['Content-Type'], 'image/webp');
+  assert.equal(unversionedHeaders['ETag'], etag);
+  assert.ok(unversionedHeaders['Cache-Control'].includes('must-revalidate'));
+  assert.equal(unversionedHeaders['Cross-Origin-Resource-Policy'], 'cross-origin');
+
+  // Versioned /img?v=<version> request -> immutable cache header
+  const versionedHeaders = buildImgResponseHeaders({
+    version,
+    etag,
+    lastModified: 'Tue, 10 Nov 2026 04:00:00 GMT',
+    byteLength: bannerBuf.byteLength,
+    requestedVersion: version,
+  });
+  assert.equal(versionedHeaders['Cache-Control'], 'public, max-age=31536000, immutable');
+
+  // Conditional request evaluation (If-None-Match & If-Modified-Since)
+  assert.equal(
+    isConditionalRequestFresh({
+      ifNoneMatch: etag,
+      etag,
+      lastModified: 'Tue, 10 Nov 2026 04:00:00 GMT',
+    }),
+    true
+  );
+  assert.equal(
+    isConditionalRequestFresh({
+      ifNoneMatch: `W/${etag}`,
+      etag,
+      lastModified: 'Tue, 10 Nov 2026 04:00:00 GMT',
+    }),
+    true
+  );
+  assert.equal(
+    isConditionalRequestFresh({
+      ifNoneMatch: '"stalehash000"',
+      etag,
+      lastModified: 'Tue, 10 Nov 2026 04:00:00 GMT',
+    }),
+    false
+  );
+
+  // GitHub Camo URL builder & README updater
+  const urls = buildCamoSafePosterUrls('https://poster.shamiltp.life', 'a1b2c3d4e5f6');
+  assert.equal(urls.directUrl, 'https://poster.shamiltp.life/img');
+  assert.equal(urls.versionedQueryUrl, 'https://poster.shamiltp.life/img?v=a1b2c3d4e5f6');
+  assert.equal(urls.versionedPathUrl, 'https://poster.shamiltp.life/img/a1b2c3d4e5f6.webp');
+
+  const updatedReadme = updateReadmePosterImageUrl(
+    '# Poster Playground\n\n[![Poster Playground](https://poster.shamiltp.life/img?v=oldversion11)](https://poster.shamiltp.life)\n',
+    'newversion99'
+  );
+  assert.ok(updatedReadme.includes('https://poster.shamiltp.life/img?v=newversion99'));
+  assert.ok(!updatedReadme.includes('oldversion11'));
+});
+
+

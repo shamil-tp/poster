@@ -507,15 +507,99 @@ export default function App() {
     activeStyle.fontMono,
   ]);
 
+  const [imgBannerVersion, setImgBannerVersion] = useState<string | null>(null);
+  const [imgPublishStatus, setImgPublishStatus] = useState<string | null>(null);
+
+  // Fetch initial /img banner version metadata
+  useEffect(() => {
+    fetch('/api/img/meta')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.meta?.version) {
+          setImgBannerVersion(data.meta.version);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Automatically sync newly rendered poster to /img in the background so /img stays fresh
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await exportRenderedPoster(activeStyle, {
+          format: 'webp',
+          scale: 1,
+          quality: 0.86,
+          triggerDownload: false,
+        });
+        const res = await fetch('/api/img/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dataUrl: result.dataUrl,
+            styleName: activeStyle.name,
+            editionNumber: activeStyle.editionNumber,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.meta?.version) {
+            setImgBannerVersion(data.meta.version);
+          }
+        }
+      } catch {
+        // Non-blocking background sync
+      }
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [activeStyle, designState.comboSignature]);
+
+  const handlePublishImgBanner = useCallback(async () => {
+    try {
+      setImgPublishStatus('Publishing /img WebP...');
+      const result = await exportRenderedPoster(activeStyle, {
+        format: 'webp',
+        scale: 1,
+        quality: 0.88,
+        triggerDownload: false,
+      });
+      const res = await fetch('/api/img/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl: result.dataUrl,
+          styleName: activeStyle.name,
+          editionNumber: activeStyle.editionNumber,
+        }),
+      });
+      if (!res.ok) throw new Error('Publish failed');
+      const data = await res.json();
+      const version = data?.meta?.version || '';
+      setImgBannerVersion(version);
+      const mdBadge =
+        data?.urls?.markdownBadge ||
+        `[![Poster Playground](https://poster.shamiltp.life/img?v=${version})](https://poster.shamiltp.life)`;
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(mdBadge).catch(() => {});
+      }
+      setImgPublishStatus(`Copied /img?v=${version}`);
+      setTimeout(() => setImgPublishStatus(null), 4000);
+    } catch {
+      setImgPublishStatus('Sync failed — retry');
+      setTimeout(() => setImgPublishStatus(null), 3000);
+    }
+  }, [activeStyle]);
+
   const handleDownloadPoster = useCallback(
     async (format: PosterExportFormat = 'png') => {
       try {
-        const label = format === 'jpeg' ? 'JPG' : 'PNG';
+        const label =
+          format === 'jpeg' ? 'JPG' : format === 'webp' ? 'WEBP' : 'PNG';
         setDownloadStatus(`Capturing Hi-Res ${label}...`);
         const result = await exportRenderedPoster(activeStyle, {
           format,
           scale: 2,
-          quality: 0.95,
+          quality: format === 'webp' ? 0.9 : 0.95,
         });
         setDownloadStatus(
           `Saved ${result.exportWidth}×${result.exportHeight} ${label}`
@@ -832,14 +916,14 @@ export default function App() {
               </button>
             </div>
 
-            {/* Primary Export Actions (Pixel-Perfect Rendered Poster Capture: PNG & JPG) */}
+            {/* Primary Export Actions (Pixel-Perfect Rendered Poster Capture: PNG, JPG, WEBP & /img Route Sync) */}
             <div className="flex flex-col gap-1.5">
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleDownloadPoster('png')}
                   aria-label="Download Poster PNG"
-                  className="col-span-2 py-2 px-3 text-xs font-semibold transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1.5"
+                  className="col-span-2 py-2 px-2.5 text-xs font-semibold transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1.5"
                   style={{
                     backgroundColor: activeStyle.accentPrimary,
                     color: activeStyle.isDark ? '#09090B' : '#FFFFFF',
@@ -854,16 +938,16 @@ export default function App() {
                   ) : (
                     <>
                       <Download className="w-3.5 h-3.5" />
-                      <span>Download PNG [D]</span>
+                      <span>PNG [D]</span>
                     </>
                   )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleDownloadPoster('jpeg')}
-                  aria-label="Download Poster JPG"
-                  className="col-span-1 py-2 px-2.5 text-xs font-semibold border transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1"
+                  onClick={() => handleDownloadPoster('webp')}
+                  aria-label="Download Poster WebP"
+                  className="col-span-1 py-2 px-2 text-xs font-semibold border transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1"
                   style={{
                     backgroundColor: activeStyle.bgSurface,
                     borderColor: activeStyle.accentPrimary,
@@ -871,12 +955,63 @@ export default function App() {
                     fontFamily: designState.typography.fontMono,
                   }}
                 >
-                  <Download
-                    className="w-3.5 h-3.5"
-                    style={{ color: activeStyle.accentPrimary }}
-                  />
+                  <span>WEBP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPoster('jpeg')}
+                  aria-label="Download Poster JPG"
+                  className="col-span-1 py-2 px-2 text-xs font-semibold border transition-transform active:scale-98 cursor-pointer inline-flex items-center justify-center gap-1"
+                  style={{
+                    backgroundColor: activeStyle.bgSurface,
+                    borderColor: activeStyle.borderColor,
+                    color: activeStyle.textPrimary,
+                    fontFamily: designState.typography.fontMono,
+                  }}
+                >
                   <span>JPG</span>
                 </button>
+              </div>
+
+              {/* /img Route & GitHub Camo Versioned URL Sync */}
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={handlePublishImgBanner}
+                  aria-label="Publish current poster to /img and copy versioned GitHub README Markdown"
+                  className="col-span-2 py-1.5 px-2.5 text-[11px] font-mono border cursor-pointer inline-flex items-center justify-center gap-1.5 transition-transform active:scale-98"
+                  style={{
+                    backgroundColor: activeStyle.bgSurface,
+                    borderColor: activeStyle.borderColor,
+                    color: activeStyle.textPrimary,
+                  }}
+                >
+                  <Check
+                    className="w-3 h-3 shrink-0"
+                    style={{ color: activeStyle.accentPrimary }}
+                  />
+                  <span className="truncate">
+                    {imgPublishStatus || 'Sync /img & Copy MD'}
+                  </span>
+                </button>
+
+                <a
+                  href={
+                    imgBannerVersion ? `/img?v=${imgBannerVersion}` : '/img'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open /img WebP endpoint"
+                  className="col-span-1 py-1.5 px-2 text-[11px] font-mono border inline-flex items-center justify-center truncate"
+                  style={{
+                    backgroundColor: activeStyle.bgSurface,
+                    borderColor: activeStyle.borderColor,
+                    color: activeStyle.accentPrimary,
+                  }}
+                >
+                  /img ↗
+                </a>
               </div>
             </div>
 

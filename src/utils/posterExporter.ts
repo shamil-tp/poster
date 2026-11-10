@@ -1,13 +1,14 @@
 import { GeneratedPosterStyle } from './posterStyles';
 import { PosterDataSlice, PortfolioIdentity } from './knowledgeParser';
 
-export type PosterExportFormat = 'png' | 'jpeg';
+export type PosterExportFormat = 'png' | 'jpeg' | 'webp';
 
 export interface PosterExportOptions {
   format?: PosterExportFormat;
   scale?: number;
   quality?: number;
   targetElement?: HTMLElement | null;
+  triggerDownload?: boolean;
 }
 
 export interface PosterExportResult {
@@ -672,10 +673,16 @@ export async function exportRenderedPoster(
   ctx.fillRect(0, 0, exportWidth, exportHeight);
   ctx.drawImage(renderedImg, 0, 0, exportWidth, exportHeight);
 
-  const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-  const ext = format === 'jpeg' ? 'jpg' : 'png';
-  const dataUrl =
+  const mimeType =
     format === 'jpeg'
+      ? 'image/jpeg'
+      : format === 'webp'
+      ? 'image/webp'
+      : 'image/png';
+  const ext =
+    format === 'jpeg' ? 'jpg' : format === 'webp' ? 'webp' : 'png';
+  const dataUrl =
+    format === 'jpeg' || format === 'webp'
       ? canvas.toDataURL(mimeType, quality)
       : canvas.toDataURL(mimeType);
 
@@ -692,13 +699,15 @@ export async function exportRenderedPoster(
     dataUrl,
   };
 
-  // Trigger browser download
-  const link = document.createElement('a');
-  link.download = filename;
-  link.href = dataUrl;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  if (options?.triggerDownload !== false) {
+    // Trigger browser download
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   return {
     filename,
