@@ -507,7 +507,7 @@ export default function App() {
     activeStyle.fontMono,
   ]);
 
-  const [imgBannerVersion, setImgBannerVersion] = useState<string>('def9408f9f29');
+  const [imgBannerVersion, setImgBannerVersion] = useState<string>('fb19713e4e81');
   const [imgPublishStatus, setImgPublishStatus] = useState<string | null>(null);
 
   // Fetch initial /img.webp banner version metadata without mutating it

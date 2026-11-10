@@ -14,7 +14,7 @@ Explore different artistic styles, experiment with unexpected combinations, and 
 
 🌐 **[poster.shamiltp.life](https://poster.shamiltp.life)**
 
-🖼️ **Direct WebP Banner**: **[poster.shamiltp.life/img.webp](https://poster.shamiltp.life/img.webp)** (`https://poster.shamiltp.life/img-def9408f9f29.webp`)
+🖼️ **Direct WebP Banner**: **[poster.shamiltp.life/img.webp](https://poster.shamiltp.life/img.webp)** (`https://poster.shamiltp.life/img-fb19713e4e81.webp`)
 
 ## Features
 
