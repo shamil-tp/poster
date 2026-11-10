@@ -9,14 +9,12 @@ import express, { Request, Response } from 'express';
 import {
   buildCamoSafePosterUrls,
   buildImgResponseHeaders,
-  computeWebpContentHash,
   isConditionalRequestFresh,
   normalizeRequestedVersion,
 } from './src/utils/imgRouteHeaders.ts';
 import {
   getActivePosterBanner,
   saveWebpBannerBuffer,
-  synthesizeDynamicPosterWebp,
 } from './src/server/posterBannerService.ts';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -30,41 +28,6 @@ async function handlePosterWebpRequest(
   res: Response
 ): Promise<void> {
   try {
-    const querySeedRaw = req.query.seed;
-    const queryRandom =
-      req.query.random === '1' ||
-      req.query.random === 'true' ||
-      req.query.fresh === '1';
-    const hasDynamicSeed =
-      queryRandom ||
-      (typeof querySeedRaw === 'string' && querySeedRaw.trim().length > 0);
-
-    // Optional on-the-fly dynamic seed generation (?seed=42 or ?random=1)
-    if (hasDynamicSeed) {
-      const seedNum = queryRandom
-        ? Math.floor(Math.random() * 100000) + 1
-        : Number.parseInt(String(querySeedRaw), 10) || 1;
-      const dynamicPoster = await synthesizeDynamicPosterWebp(seedNum);
-      const { version, etag } = computeWebpContentHash(dynamicPoster.buffer);
-      const lastModified = new Date().toUTCString();
-      const headers = buildImgResponseHeaders({
-        version,
-        etag,
-        lastModified,
-        byteLength: dynamicPoster.buffer.byteLength,
-        requestedVersion: null,
-        isDynamicQuery: true,
-      });
-
-      res.set(headers);
-      if (req.method === 'HEAD') {
-        res.status(200).end();
-        return;
-      }
-      res.status(200).end(dynamicPoster.buffer);
-      return;
-    }
-
     const record = await getActivePosterBanner();
     const rawRequestedVersion =
       (typeof req.params.version === 'string' ? req.params.version : null) ||
@@ -104,21 +67,22 @@ async function handlePosterWebpRequest(
     }
     res.status(200).end(record.buffer);
   } catch (err) {
-    console.error('Error serving /img WebP poster:', err);
-    res.status(500).type('text/plain').send('Failed to render WebP poster');
+    console.error('Error serving /img.webp:', err);
+    res.status(500).type('text/plain').send('Failed to serve WebP image');
   }
 }
 
 async function startServer(): Promise<void> {
   const app = express();
   app.disable('x-powered-by');
-  app.disable('etag'); // Managed explicitly via SHA-256 content-hash ETag on /img
+  app.disable('etag'); // Managed explicitly via SHA-256 content-hash ETag on /img.webp
 
   app.use(express.json({ limit: '25mb' }));
 
-  // 1. Dedicated WebP Banner Routes: /img, /img.webp, /img/:version
-  app.get('/img', handlePosterWebpRequest);
+  // 1. Direct WebP Image Endpoints: /img.webp, /img-<version>.webp, /img, /img/:version
   app.get('/img.webp', handlePosterWebpRequest);
+  app.get('/img-:version.webp', handlePosterWebpRequest);
+  app.get('/img', handlePosterWebpRequest);
   app.get('/img/:version', handlePosterWebpRequest);
 
   // 2. Metadata & GitHub Camo URL Inspection Endpoint
@@ -140,44 +104,30 @@ async function startServer(): Promise<void> {
     }
   });
 
-  // 3. Publish / Sync Active Poster to /img (updates WebP, ETag, Last-Modified, and README.md)
+  // 3. Explicit Publish Endpoint (only triggered when explicitly invoked)
   app.post('/api/img/publish', async (req: Request, res: Response) => {
     try {
-      const { dataUrl, styleName, editionNumber, seed, regenerate } =
-        req.body || {};
+      const { dataUrl, styleName, editionNumber } = req.body || {};
 
-      let rawBuffer: Buffer;
-      let resolvedStyleName: string | undefined = styleName;
-      let resolvedEdition: number | undefined = editionNumber;
-
-      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
-        const commaIndex = dataUrl.indexOf(',');
-        if (commaIndex === -1) {
-          res.status(400).json({ ok: false, error: 'Invalid image dataUrl' });
-          return;
-        }
-        const base64Payload = dataUrl.slice(commaIndex + 1);
-        rawBuffer = Buffer.from(base64Payload, 'base64');
-      } else if (regenerate || typeof seed === 'number') {
-        const synthesized = await synthesizeDynamicPosterWebp(
-          typeof seed === 'number'
-            ? seed
-            : Math.floor(Math.random() * 90000) + 1
-        );
-        rawBuffer = synthesized.buffer;
-        resolvedStyleName = resolvedStyleName || synthesized.styleName;
-        resolvedEdition = resolvedEdition || synthesized.editionNumber;
-      } else {
+      if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
         res.status(400).json({
           ok: false,
-          error: 'Provide either a rendered image dataUrl or regenerate: true',
+          error: 'Provide a valid image dataUrl',
         });
         return;
       }
 
+      const commaIndex = dataUrl.indexOf(',');
+      if (commaIndex === -1) {
+        res.status(400).json({ ok: false, error: 'Invalid image dataUrl' });
+        return;
+      }
+      const base64Payload = dataUrl.slice(commaIndex + 1);
+      const rawBuffer = Buffer.from(base64Payload, 'base64');
+
       const saved = await saveWebpBannerBuffer(rawBuffer, {
-        styleName: resolvedStyleName,
-        editionNumber: resolvedEdition,
+        styleName,
+        editionNumber,
         baseUrl: 'https://poster.shamiltp.life',
       });
       const urls = buildCamoSafePosterUrls(
@@ -191,10 +141,10 @@ async function startServer(): Promise<void> {
         urls,
       });
     } catch (err) {
-      console.error('Error publishing /img WebP poster:', err);
+      console.error('Error publishing /img.webp:', err);
       res
         .status(500)
-        .json({ ok: false, error: 'Failed to publish WebP poster' });
+        .json({ ok: false, error: 'Failed to publish WebP image' });
     }
   });
 
@@ -219,7 +169,7 @@ async function startServer(): Promise<void> {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(
-      `Poster Playground server listening on http://0.0.0.0:${PORT} (/img WebP endpoint ready)`
+      `Poster Playground server listening on http://0.0.0.0:${PORT} (/img.webp ready)`
     );
   });
 }

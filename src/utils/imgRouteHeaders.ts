@@ -13,6 +13,7 @@ export interface WebpBannerMetadata {
   height: number;
   bytes: number;
   format: 'webp';
+  versionedFilename?: string;
   styleName?: string;
   editionNumber?: number;
 }
@@ -37,9 +38,11 @@ export interface ConditionalRequestParams {
 export interface CamoSafePosterUrls {
   version: string;
   directUrl: string;
+  versionedFilenameUrl: string;
   versionedQueryUrl: string;
   versionedPathUrl: string;
   markdownBadge: string;
+  versionedMarkdownBadge: string;
   htmlImgTag: string;
 }
 
@@ -81,7 +84,8 @@ export function computeWebpContentHash(buffer: Uint8Array | Buffer): {
 }
 
 /**
- * Normalizes a version token from query (`?v=abc123`) or path (`/img/abc123.webp`).
+ * Normalizes a version token from query (`?v=def9408f9f29`), versioned filename
+ * (`/img-def9408f9f29.webp`), or path (`/img/def9408f9f29.webp`).
  */
 export function normalizeRequestedVersion(
   rawVersion?: string | null
@@ -90,18 +94,20 @@ export function normalizeRequestedVersion(
   const trimmed = rawVersion
     .trim()
     .replace(/^["']+|["']+$/g, '')
+    .replace(/^\/+/, '')
+    .replace(/^img[-_/]/i, '')
     .replace(/\.webp$/i, '')
     .replace(/^v[-_]?/i, (m) => (rawVersion.length > 12 ? '' : m));
   return trimmed.length > 0 ? trimmed : null;
 }
 
 /**
- * Builds HTTP response headers for `/img` and `/img/:version` routes.
+ * Builds HTTP response headers for `/img.webp`, `/img-<version>.webp`, and `/img`.
  *
- * - Exact content-hash hits (`/img?v=<hash>` or `/img/<hash>.webp`) receive
- *   `Cache-Control: public, max-age=31536000, immutable` because the URL itself
- *   is keyed to the exact image bytes (busting GitHub Camo when the hash changes).
- * - Unversioned `/img` or mismatched version requests receive
+ * - Exact content-hash hits (`/img-<hash>.webp` or `/img.webp?v=<hash>`) receive
+ *   `Cache-Control: public, max-age=31536000, immutable` so versioned URLs cache
+ *   efficiently while busting GitHub Camo whenever the filename/hash changes.
+ * - Unversioned `/img.webp` requests receive
  *   `Cache-Control: public, max-age=0, s-maxage=0, must-revalidate, no-cache, no-transform`
  *   so browsers, CDNs, and proxies always revalidate against `ETag` / `Last-Modified`.
  */
@@ -123,7 +129,7 @@ export function buildImgResponseHeaders(
   const headers: Record<string, string> = {
     'Content-Type': 'image/webp',
     'Content-Length': String(params.byteLength),
-    'Content-Disposition': `inline; filename="shamil-tp-poster-${params.version}.webp"`,
+    'Content-Disposition': `inline; filename="img-${params.version}.webp"`,
     ETag: params.etag,
     'Last-Modified': params.lastModified,
     'Cache-Control': cacheControl,
@@ -146,7 +152,7 @@ export function buildImgResponseHeaders(
 
 /**
  * Evaluates HTTP conditional request headers (`If-None-Match` and `If-Modified-Since`)
- * according to RFC 7232 so unchanged poster banners return `304 Not Modified`.
+ * according to RFC 7232 so unchanged requests return `304 Not Modified`.
  */
 export function isConditionalRequestFresh(
   params: ConditionalRequestParams
@@ -176,7 +182,7 @@ export function isConditionalRequestFresh(
 }
 
 /**
- * Generates direct and GitHub-Camo-busting versioned URLs and Markdown snippets.
+ * Generates direct `.webp` and GitHub-Camo-busting versioned `.webp` URLs and Markdown snippets.
  */
 export function buildCamoSafePosterUrls(
   baseUrl: string,
@@ -186,25 +192,28 @@ export function buildCamoSafePosterUrls(
     /\/+$/,
     ''
   );
-  const directUrl = `${cleanBase}/img`;
-  const versionedQueryUrl = `${cleanBase}/img?v=${version}`;
-  const versionedPathUrl = `${cleanBase}/img/${version}.webp`;
-  const markdownBadge = `[![Poster Playground](${versionedQueryUrl})](${cleanBase})`;
-  const htmlImgTag = `<img src="${versionedQueryUrl}" alt="Poster Playground — Shamil TP Generative Poster Portfolio" width="1440" height="900" />`;
+  const directUrl = `${cleanBase}/img.webp`;
+  const versionedFilenameUrl = `${cleanBase}/img-${version}.webp`;
+  const versionedQueryUrl = `${cleanBase}/img.webp?v=${version}`;
+  const versionedPathUrl = versionedFilenameUrl;
+  const markdownBadge = `[![Poster Playground](${directUrl})](${cleanBase})`;
+  const versionedMarkdownBadge = `[![Poster Playground](${versionedFilenameUrl})](${cleanBase})`;
+  const htmlImgTag = `<img width="1200" height="475" alt="Poster Playground" src="${directUrl}" />`;
 
   return {
     version,
     directUrl,
+    versionedFilenameUrl,
     versionedQueryUrl,
     versionedPathUrl,
     markdownBadge,
+    versionedMarkdownBadge,
     htmlImgTag,
   };
 }
 
 /**
- * Updates any `/img` banner URL in a README.md string with the latest content-hash
- * version so GitHub's Camo proxy immediately fetches the updated WebP image.
+ * Updates versioned `/img-<hash>.webp` or `/img?v=<hash>` references in a README.md string.
  */
 export function updateReadmePosterImageUrl(
   readmeMarkdown: string,
@@ -214,28 +223,15 @@ export function updateReadmePosterImageUrl(
   const cleanBase = baseUrl.replace(/\/+$/, '');
   const escapedBase = cleanBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  // Pattern 1: Replace existing `/img?v=...` or `/img/<hash>.webp` or bare `/img` inside Markdown/HTML image URLs
-  const imgUrlRegex = new RegExp(
-    `(${escapedBase}\\/img)(?:\\/[a-zA-Z0-9._-]+\\.webp)?(?:\\?v=[a-zA-Z0-9._-]+)?`,
+  // Replace versioned filename `/img-<oldhash>.webp` or query `/img(.webp)?v=<oldhash>`
+  const versionedRegex = new RegExp(
+    `(${escapedBase}\\/img)(?:-[a-zA-Z0-9]+\\.webp|(?:\\.webp)?\\?v=[a-zA-Z0-9._-]+|\\/[a-zA-Z0-9._-]+\\.webp)`,
     'g'
   );
 
-  if (imgUrlRegex.test(readmeMarkdown)) {
-    return readmeMarkdown.replace(imgUrlRegex, `$1?v=${version}`);
+  if (versionedRegex.test(readmeMarkdown)) {
+    return readmeMarkdown.replace(versionedRegex, `$1-${version}.webp`);
   }
 
-  // Pattern 2: If README does not yet contain the banner image, insert it below the main H1 heading
-  const bannerSnippet = `\n[![Poster Playground](${cleanBase}/img?v=${version})](${cleanBase})\n`;
-  const h1Match = readmeMarkdown.match(/^#\s+.+$/m);
-  if (h1Match && h1Match.index !== undefined) {
-    const insertPos = h1Match.index + h1Match[0].length;
-    return (
-      readmeMarkdown.slice(0, insertPos) +
-      '\n' +
-      bannerSnippet +
-      readmeMarkdown.slice(insertPos)
-    );
-  }
-
-  return `${bannerSnippet}\n${readmeMarkdown}`;
+  return readmeMarkdown;
 }
