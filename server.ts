@@ -148,6 +148,46 @@ async function startServer(): Promise<void> {
     }
   });
 
+  // 4. Standalone Bulk Generation & ZIP Download Endpoint
+  app.post('/api/bulk-generate', async (req: Request, res: Response) => {
+    try {
+      const { count = 10, concurrency = 4, format = 'png', width = 1440, height = 900 } = req.body || {};
+      const { runBulkPosterGeneration } = await import('./src/server/bulkPosterGenerator.ts');
+      
+      const safeCount = Math.min(1000, Math.max(1, Number(count) || 10));
+      const safeConcurrency = Math.min(8, Math.max(1, Number(concurrency) || 4));
+
+      const result = await runBulkPosterGeneration({
+        count: safeCount,
+        concurrency: safeConcurrency,
+        format: format === 'jpeg' ? 'jpeg' : 'png',
+        width: Number(width) || 1440,
+        height: Number(height) || 900,
+        targetUrl: `http://localhost:${PORT}`,
+      });
+
+      res.json({
+        ok: true,
+        ...result,
+        downloadUrl: `/api/bulk-download/${path.basename(result.zipPath)}`,
+      });
+    } catch (err: any) {
+      console.error('Bulk generation error:', err);
+      res.status(500).json({ ok: false, error: err.message || 'Bulk generation failed' });
+    }
+  });
+
+  // Download generated ZIP archive
+  app.get('/api/bulk-download/:filename', (req: Request, res: Response) => {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(process.cwd(), 'dist-posters', filename);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).send('ZIP file not found');
+      return;
+    }
+    res.download(filePath, filename);
+  });
+
   const distDir = path.resolve(process.cwd(), 'dist');
   const distIndexHtml = path.join(distDir, 'index.html');
   const isProd =

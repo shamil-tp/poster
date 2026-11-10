@@ -582,6 +582,30 @@ export default function App() {
     return () => window.removeEventListener('keydown', onDownloadShortcut);
   }, [handleDownloadPoster, isStyleModalOpen, isKnowledgeModalOpen]);
 
+  // Expose headless Bulk Generation API on window so node automation or workers
+  // can directly set seeds, advance designs, and export high-res PNG buffers without UI delay
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__POSTER_STUDIO_API__ = {
+      getState: () => designState,
+      getStyle: () => activeStyle,
+      regenerate: (options?: Parameters<typeof handleRegenerateDesign>[0]) => {
+        handleRegenerateDesign(options);
+      },
+      setDesignStateDirectly: (newState: CompleteDesignState) => {
+        setDesignState(newState);
+      },
+      exportPosterDataUrl: async (format: PosterExportFormat = 'png', scale = 2) => {
+        const result = await exportRenderedPoster(activeStyle, {
+          format,
+          scale,
+          quality: 0.95,
+          triggerDownload: false,
+        });
+        return result;
+      },
+    };
+  }, [designState, activeStyle, handleRegenerateDesign]);
+
   return (
     <div
       className="relative h-[100dvh] min-h-[100svh] w-[100vw] overflow-hidden flex flex-col select-none"
