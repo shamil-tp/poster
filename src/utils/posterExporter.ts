@@ -443,6 +443,14 @@ async function synchronizeClonedPosterTree(
         cloneEl.style.writingMode = computed.writingMode;
       }
 
+      const maskImage =
+        computed.getPropertyValue('mask-image') ||
+        computed.getPropertyValue('-webkit-mask-image');
+      if (maskImage && maskImage !== 'none') {
+        cloneEl.style.setProperty('mask-image', maskImage);
+        cloneEl.style.setProperty('-webkit-mask-image', maskImage);
+      }
+
       const strokeWidth = computed.getPropertyValue('-webkit-text-stroke-width');
       const strokeColor = computed.getPropertyValue('-webkit-text-stroke-color');
       if (strokeWidth && strokeWidth !== '0px') {

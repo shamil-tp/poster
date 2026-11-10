@@ -205,7 +205,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
               className="text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate"
               style={{ fontFamily: typography.fontMono, color: style.accentPrimary }}
             >
-              0{slice.focalProject.index} // {slice.focalProject.category}
+              0{slice.focalProject.index}. {slice.focalProject.category}
             </span>
 
             <div className="flex items-center gap-2 shrink-0 text-[10px] sm:text-[11px]">
@@ -339,9 +339,9 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
               {slice.focalProject.metrics.map((metric, idx) => (
                 <div
                   key={idx}
-                  className="p-2 border-l-2"
+                  className="p-2 border"
                   style={{
-                    borderColor: style.accentPrimary,
+                    borderColor: `${style.borderColor}88`,
                     backgroundColor: `${style.bgSurface}99`,
                   }}
                 >
@@ -631,7 +631,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
                   style={{ borderColor: `${style.borderColor}66` }}
                 >
                   <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: style.accentPrimary }}>
-                    Selected Monograph // Click for Next
+                    Selected Monograph · Click for Next
                   </div>
                   <h2
                     className="text-base sm:text-xl font-bold"
@@ -677,7 +677,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
         // Wall-to-wall monumental typography IS the visual centerpiece, paired with giant project numerals & stark rules
         return (
           <div
-            className="relative z-10 w-full h-full flex flex-col justify-between p-4 sm:p-8 lg:p-10 overflow-hidden border-l-[12px] sm:border-l-[20px]"
+            className="relative z-10 w-full h-full flex flex-col justify-between p-5 sm:p-9 lg:p-12 overflow-hidden border-t-8"
             style={{ borderColor: style.accentPrimary }}
           >
             {/* Top Swiss Grid Specification Bar */}
@@ -814,34 +814,14 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
       }
 
       case 'layered-collage-zine': {
-        // PARADIGM 4: TACTILE CUT-AND-PASTE ZINE COLLAGE
-        // Scattered tilted paper cutouts, taped Polaroid photo specimen, circular rubber stamp badge
+        // PARADIGM 4: MIXED-MEDIA EDITORIAL SPREAD WITH GENEROUS BREATHING ROOM
         return (
-          <div className="relative z-10 w-full h-full flex flex-col justify-between p-4 sm:p-7 lg:p-10 overflow-hidden">
-            {/* Floating Rubber Stamp Badge in Top-Left/Center */}
-            <div
-              onClick={() => onOpenDossierModal()}
-              className="hidden xl:flex absolute top-8 right-28 z-30 w-28 h-28 rounded-full border-2 border-dashed flex-col items-center justify-center text-center p-2 rotate-12 cursor-pointer"
-              style={{
-                borderColor: style.accentPrimary,
-                color: style.accentPrimary,
-                backgroundColor: `${style.bgElevated}EE`,
-                fontFamily: typography.fontMono,
-              }}
-            >
-              <span className="text-[9px] font-bold uppercase tracking-widest">
-                VERIFIED
-              </span>
-              <span className="text-[10px] font-extrabold leading-tight mt-0.5 line-clamp-2">
-                {slice.featuredHackathon.result}
-              </span>
-            </div>
-
-            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center my-auto overflow-hidden">
-              {/* Left Tilted Zine Cutouts (7 cols) */}
-              <div className="lg:col-span-7 flex flex-col gap-3.5 z-20 min-h-0">
+          <div className="relative z-10 w-full h-full flex flex-col justify-between p-5 sm:p-9 lg:p-12 overflow-hidden">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center my-auto overflow-hidden">
+              {/* Left Editorial Typography & Uncluttered Dossier (6 cols) */}
+              <div className="lg:col-span-6 flex flex-col gap-5 z-20 min-h-0">
                 <div
-                  className="p-3.5 sm:p-5 -rotate-1 shadow-lg"
+                  className="p-4 sm:p-6"
                   style={{
                     backgroundColor: style.bgElevated,
                     ...getFrameBorderStyle(true),
@@ -853,19 +833,17 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
                 {renderProjectNarrative({
                   framed: true,
                   compact: true,
-                  rotationClass: 'rotate-1 shadow-md',
                 })}
               </div>
 
-              {/* Right Taped Polaroid Specimen (5 cols) */}
-              <div className="hidden lg:flex lg:col-span-5 h-full max-h-[430px] items-center justify-center relative z-10 lg:-ml-4">
+              {/* Right Poised Visual Specimen Stage with Ample Negative Space (6 cols) */}
+              <div className="hidden lg:flex lg:col-span-6 h-full max-h-[440px] items-center justify-center relative z-10">
                 <ProceduralIllustration
                   artDirection={style}
                   config={illustration}
                   photo={slice.photo}
                   onCyclePhoto={onCyclePhoto}
                   frameVariant="polaroid-tape"
-                  className="rotate-2 shadow-2xl"
                 />
               </div>
             </div>
@@ -958,7 +936,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
                   style={{ borderColor: `${style.borderColor}66` }}
                 >
                   <div className="text-[11px] font-mono font-semibold" style={{ color: style.accentPrimary }}>
-                    Next Focus // {slice.secondaryProject.shortName}
+                    Next Focus · {slice.secondaryProject.shortName}
                   </div>
                   <div className="text-sm font-bold mt-0.5" style={{ fontFamily: typography.fontDisplay }}>
                     {slice.featuredSkillGroup.category}
@@ -980,7 +958,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
             {/* Giant Masthead */}
             <div className="relative z-20 shrink-0 pb-2 border-b-2" style={{ borderColor: style.textPrimary }}>
               <div className="flex items-center justify-between text-[10px] sm:text-xs font-mono uppercase tracking-widest mb-1 pr-12 lg:pr-16" style={{ color: style.textSecondary }}>
-                <span>ISSUE NO. {String(style.editionNumber).padStart(3, '0')} // {style.name}</span>
+                <span>ISSUE NO. {String(style.editionNumber).padStart(3, '0')} · {style.name}</span>
                 <span className="hidden sm:inline">{identity.location}</span>
                 <span>shamiltp.me</span>
               </div>
@@ -1122,7 +1100,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
               title="Click or press [L] to randomize layout"
             >
               <span className="text-xs font-mono font-bold tracking-widest uppercase [writing-mode:vertical-rl] rotate-180">
-                {style.name} // BAUHAUS EDITION #{String(style.editionNumber).padStart(3, '0')}
+                {style.name} · BAUHAUS EDITION #{String(style.editionNumber).padStart(3, '0')}
               </span>
               <span
                 className="text-5xl font-black tracking-tighter [writing-mode:vertical-rl] rotate-180 leading-none"
@@ -1170,7 +1148,7 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
                 }}
               >
                 <div className="text-[10px] font-mono font-bold uppercase tracking-widest">
-                  NEXT MODULE // {slice.secondaryProject.shortName}
+                  NEXT MODULE · {slice.secondaryProject.shortName}
                 </div>
                 <div className="text-base font-black mt-0.5 truncate" style={{ fontFamily: typography.fontDisplay }}>
                   {slice.featuredSkillGroup.category}
@@ -1261,33 +1239,31 @@ export const PosterCanvas: React.FC<PosterCanvasProps> = ({
       }
 
       case 'asymmetric-avant-garde': {
-        // PARADIGM 11: DECONSTRUCTED OFF-GRID OVERLAP
-        // Oversized off-axis artwork in upper-right overlapped by floating display banner & asymmetric lower-left project
+        // PARADIGM 11: ASYMMETRIC EDITORIAL WITH GENEROUS NEGATIVE SPACE
+        // Clean separation between left editorial typography and right sculptural stage (zero colliding overlaps)
         return (
-          <div className="relative z-10 w-full h-full flex flex-col justify-between p-5 sm:p-8 lg:p-11 overflow-hidden">
-            {/* Oversized Off-Axis Sculpture on Desktop */}
-            <div className="hidden lg:block absolute right-10 top-10 bottom-16 w-[46%] z-10">
-              <ProceduralIllustration
-                artDirection={style}
-                config={illustration}
-                photo={slice.photo}
-                onCyclePhoto={onCyclePhoto}
-                frameVariant="arch-niche"
-              />
-            </div>
+          <div className="relative z-10 w-full h-full flex flex-col justify-between p-5 sm:p-9 lg:p-12 overflow-hidden">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center my-auto overflow-hidden">
+              {/* Left Editorial Column with Generous Breathing Room (7 cols) */}
+              <div className="lg:col-span-7 flex flex-col justify-between gap-6 min-h-0 pr-0 lg:pr-4">
+                {renderMobileIdentityHeader('text-4xl sm:text-6xl lg:text-7xl', 'left')}
+                {renderProjectNarrative({
+                  translucent: true,
+                  framed: true,
+                  compact: true,
+                })}
+              </div>
 
-            {/* Overlapping Display Title */}
-            <div className="relative z-20 lg:max-w-[66%] shrink-0">
-              {renderMobileIdentityHeader('text-4xl sm:text-6xl lg:text-8xl', 'left')}
-            </div>
-
-            {/* Floating Translucent Placard */}
-            <div className="relative z-20 lg:w-[56%] my-auto flex flex-col gap-3 min-h-0">
-              {renderProjectNarrative({
-                translucent: true,
-                framed: true,
-                compact: true,
-              })}
+              {/* Right Poised Off-Axis Artwork Stage (5 cols) */}
+              <div className="hidden lg:flex lg:col-span-5 h-full max-h-[450px] items-center justify-center">
+                <ProceduralIllustration
+                  artDirection={style}
+                  config={illustration}
+                  photo={slice.photo}
+                  onCyclePhoto={onCyclePhoto}
+                  frameVariant="arch-niche"
+                />
+              </div>
             </div>
 
             <div className="relative z-20">{renderPosterColophon()}</div>

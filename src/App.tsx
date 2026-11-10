@@ -632,7 +632,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* Active Multi-Image Collage Ensemble Indicator */}
+            {/* Active Image Composition Indicator */}
             <div
               className="flex items-center justify-between text-[10px] font-mono px-2 py-1 border"
               style={{
@@ -642,17 +642,15 @@ export default function App() {
               }}
             >
               <span className="truncate">
-                {designState.illustration.imageCount}x Collage:{' '}
-                {designState.illustration.ensembleAssets
-                  .slice(0, designState.illustration.imageCount)
-                  .map((a) => a.filename)
-                  .join(' + ')}
+                {designState.illustration.imageCount === 1
+                  ? `Solo: ${designState.illustration.primaryAsset.filename}`
+                  : `Diptych: ${designState.illustration.primaryAsset.filename} + ${designState.illustration.secondaryAsset.filename}`}
               </span>
               <span
                 className="font-semibold ml-2 shrink-0"
                 style={{ color: activeStyle.accentPrimary }}
               >
-                {designState.illustration.collageArrangement.split('-')[0]}
+                {designState.illustration.imageCount === 1 ? '1 Plate' : '2 Plates'}
               </span>
             </div>
 

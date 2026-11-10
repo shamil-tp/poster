@@ -171,13 +171,17 @@ test('consecutive regenerations produce distinct styles, layouts, collage arrang
     for (const a of next.illustration.ensembleAssets) {
       usedAssets.add(a.id);
     }
+    assert.ok(
+      next.illustration.imageCount === 1 || next.illustration.imageCount === 2,
+      `Expected imageCount to be 1 or 2, got ${next.illustration.imageCount}`
+    );
     usedArrangements.add(next.illustration.collageArrangement);
     seenImageCounts.add(next.illustration.imageCount);
     prev = next;
   }
   assert.ok(usedAssets.size >= 20, `Expected >= 20 distinct assets across 30 ensembles, got ${usedAssets.size}`);
   assert.ok(usedArrangements.size >= 6, `Expected >= 6 distinct collage arrangements, got ${usedArrangements.size}`);
-  assert.ok(seenImageCounts.size >= 3, `Expected >= 3 distinct imageCount values (1..4), got ${seenImageCounts.size}`);
+  assert.ok(seenImageCounts.has(1) && seenImageCounts.has(2), 'Expected both single-image (1) and two-image (2) compositions');
 });
 
 test('legacy createHybridDesignStyle and generateUniquePosterRecipe remain functional', () => {
